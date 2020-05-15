@@ -1,3 +1,19 @@
+/*
+ * Copyright 2020 Paul Scherrer Institute
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include <iostream>
 
 #include "JFApp.h"
@@ -13,9 +29,9 @@ int setup_ibverbs(ib_settings_t &settings, std::string ib_device_name, size_t se
 		std::cerr << "Failed to get IB devices list." << std::endl;
 		return 1;
 	}
-        std::cout << "IB device: " << ib_device_name << std::endl;
+
 	for (int i = 0; i < num_devices; i++) {
-		if (strncmp(ib_device_name.c_str(), ibv_get_device_name(dev_list[i]),7) == 0) selected = i;
+		if (strncmp(ib_device_name.c_str(), ibv_get_device_name(dev_list[i]),8) == 0) selected = i;
 	}
 
 	if (selected == -1) {
@@ -56,7 +72,11 @@ int setup_ibverbs(ib_settings_t &settings, std::string ib_device_name, size_t se
 		std::cerr << "Failed to create IB queue pair." << std::endl;
 		return 1;
 	}
+        if (switch_to_init(settings) == 1) return 1;
+	return 0;
+}
 
+int switch_to_init(ib_settings_t &settings) {
 	struct ibv_qp_attr qp_attr;
 	int qp_flags;
 
@@ -75,13 +95,34 @@ int setup_ibverbs(ib_settings_t &settings, std::string ib_device_name, size_t se
 		return 1;
 	}
 
-	ret = ibv_query_port(settings.context, 1, &settings.port_attr);
-	if (ret != 0) 
+        ret = ibv_query_port(settings.context, 1, &settings.port_attr);
+ 	if (ret != 0)
         {
-            std::cout << "Cannot query port" << std::endl;
+             std::cout << "Cannot query port" << std::endl;
+             return 1;
         }
-	
-	return 0;
+        return 0;
+}
+
+int switch_to_reset(ib_settings_t &settings) {
+	struct ibv_qp_attr qp_attr;
+	int qp_flags;
+
+	memset(&qp_attr, 0, sizeof(qp_attr));
+
+	qp_flags = IBV_QP_STATE;
+	qp_attr.qp_state = IBV_QPS_RESET;
+
+	int ret = ibv_modify_qp(settings.qp, &qp_attr, qp_flags);
+	if (ret < 0)
+	{
+		std::cerr << "Failed modify IB queue pair to reset." << std::endl;
+		return 1;
+	}
+
+	ibv_query_port(settings.context, 1, &settings.port_attr);
+        return 0;
+
 }
 
 int switch_to_rtr(ib_settings_t &settings, uint32_t rq_psn, uint16_t dlid, uint32_t dest_qp_num) {
@@ -104,16 +145,16 @@ int switch_to_rtr(ib_settings_t &settings, uint32_t rq_psn, uint16_t dlid, uint3
 	qp_attr.ah_attr.dlid       = dlid;
         qp_attr.ah_attr.port_num   = 1;
 	int ret = ibv_modify_qp(settings.qp, &qp_attr, qp_flags);
-        
+
+	std::cerr << "PSN: " << rq_psn << " Dest DLID: " << dlid << " Dest QP: " << dest_qp_num << std::endl;
+	std::cerr << "PSN: " << rq_psn << " Own  DLID: " << settings.port_attr.lid << " Own  QP: " << settings.qp->qp_num << std::endl;
 
 	if (ret) {
 		std::cerr << "Failed to set IB queue pair to ready to receive " << ret << std::endl;
-                std::cerr << "PSN: " << rq_psn << " Dest DLID: " << dlid << " Dest QP: " << dest_qp_num << std::endl;
-                std::cerr << "PSN: " << rq_psn << " Own  DLID: " << settings.port_attr.lid << " Own  QP: " << settings.qp->qp_num << std::endl;
-
+		std::cerr << "PSN: " << rq_psn << " Dest DLID: " << dlid << " Dest QP: " << dest_qp_num << std::endl;
+		std::cerr << "PSN: " << rq_psn << " Own  DLID: " << settings.port_attr.lid << " Own  QP: " << settings.qp->qp_num << std::endl;
 		return 1;
 	}
-
 	return 0;	
 }
 
