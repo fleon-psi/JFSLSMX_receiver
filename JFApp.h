@@ -34,6 +34,7 @@ struct experiment_settings_t {
         double   omega_angle_per_image;
         double   strong_pixel_value;
         uint16_t ntrigger;
+        uint16_t delay_per_trigger;
 };
 
 struct receiver_output_t {
