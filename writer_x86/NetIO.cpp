@@ -209,6 +209,10 @@ int disconnect_from_power9(int card_id) {
 
 	// Close TCP/IP socket
 	close(writer_connection_settings[card_id].sockfd);
+        
+        // Reset IB status
+        switch_to_reset(writer_connection_settings[card_id].ib_settings);
+        switch_to_init(writer_connection_settings[card_id].ib_settings);
     
 	return 0;
 }
