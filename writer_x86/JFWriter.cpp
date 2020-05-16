@@ -117,7 +117,7 @@ int parse_input(int argc, char **argv) {
                         writer_settings.write_hdf5 = true;
                         break;
 		case 'q':
-			experiment_settings.conversion_mode = 255;
+			experiment_settings.conversion_mode = MODE_QUIT;
 			break;
 		case 'c':
 			experiment_settings.nframes_to_collect = atoi(optarg);
@@ -176,13 +176,6 @@ int parse_input(int argc, char **argv) {
 	return 0;
 }
 
-int allocate_memory(int card_id) {
-	// IB buffer
-	writer_connection_settings[card_id].ib_buffer = (char *) malloc(RDMA_RQ_SIZE * COMPOSED_IMAGE_SIZE * sizeof(uint16_t));
-        if (writer_connection_settings[card_id].ib_buffer == NULL) return 1;
-        return 0;
-}
-
 int main(int argc, char **argv) {
 	int ret;
 
@@ -193,8 +186,8 @@ int main(int argc, char **argv) {
         H5Zregister(bshuf_H5Filter);
 
 	for (int i = 0; i < NCARDS; i++) {
-            allocate_memory(i);
-            open_connection_card(i);
+            setup_infiniband(i);
+            connect_to_power9(i);
 	    remaining_frames[i] = experiment_settings.nframes_to_write;
 	    pthread_mutex_init(&(remaining_frames_mutex[i]), NULL);
 	}
@@ -252,7 +245,10 @@ int main(int argc, char **argv) {
 	}
 
         // Involves barrier after collecting data
-	for (int i = 0; i < NCARDS; i++) close_connection_card(i);
+	for (int i = 0; i < NCARDS; i++) {
+            disconnect_from_power9(i);
+            close_infiniband(i);
+        }
 
 #ifndef OFFLINE        
         close_detector(&det);

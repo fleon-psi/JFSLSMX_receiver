@@ -101,8 +101,10 @@ int setup_detector(sls::Detector *det);
 int trigger_detector(sls::Detector *det);
 int close_detector(sls::Detector *det);
 
-int open_connection_card(int card_id);
+int setup_infiniband(int card_id);
+int close_infiniband(int card_id);
+int connect_to_power9(int card_id);
+int disconnect_from_power9(int card_id);
 int exchange_magic_number(int sockfd);
-int close_connection_card(int card_id);
 
 #endif // JFWRITER_H_
