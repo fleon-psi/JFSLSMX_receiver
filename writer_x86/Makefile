@@ -30,7 +30,7 @@ endif
 endif
 
 SNAP_LIBS=${SNAP_ROOT}/software/lib/libsnap.a -lcxl 
-SNAP_INCLUDE=-I${SNAP_ROOT}/software/include -I/home/jungfrau/git/pslse/common
+SNAP_INCLUDE=-I${SNAP_ROOT}/software/include
 
 SLS_DETECTOR_PATH=/home/jungfrau/git/slsDetectorPackage
 SLS_DETECTOR_INCLUDE=-I${SLS_DETECTOR_PATH}/slsDetectorSoftware/include -I${SLS_DETECTOR_PATH}/slsSupportLib/include
