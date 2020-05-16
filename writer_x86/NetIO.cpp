@@ -89,7 +89,7 @@ int open_connection_card(int card_id) {
 	send(writer_connection_settings[card_id].sockfd,
 			&experiment_settings, sizeof(experiment_settings_t), 0);
 
-	if (experiment_settings.conversion_mode == 255) {
+	if (experiment_settings.conversion_mode == MODE_EXIT) {
 		return 0;
 	}
 
@@ -164,7 +164,7 @@ int tcp_receive(int sockfd, char *buffer, size_t size) {
 }
 
 int close_connection_card(int card_id) {
-        if (experiment_settings.conversion_mode == 255) {
+        if (experiment_settings.conversion_mode == MODE_EXIT) {
                 close(writer_connection_settings[card_id].sockfd);
                 return 0;
         }
