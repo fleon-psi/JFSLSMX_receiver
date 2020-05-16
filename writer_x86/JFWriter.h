@@ -18,6 +18,8 @@
 #define JFWRITER_H_
 
 #include <hdf5.h>
+#include <Detector.h>
+
 #include "../JFApp.h"
 
 #define RDMA_RQ_SIZE 4096L // Maximum number of receive elements
@@ -81,11 +83,27 @@ extern uint8_t writers_done_per_file;
 extern pthread_mutex_t writers_done_per_file_mutex;
 extern pthread_cond_t writers_done_per_file_cond;
 
+extern size_t total_compressed_size;
+extern pthread_mutex_t total_compressed_size_mutex;
+
+extern uint64_t remaining_frames[NCARDS];
+extern pthread_mutex_t remaining_frames_mutex[NCARDS];
+
 int open_data_hdf5();
 int close_data_hdf5();
 int save_data_hdf(char *data, size_t size, size_t frame, int chunk);
 int save_gain_pedestal_hdf5();
 int save_master_hdf5();
 int pack_data_hdf5();
+
+int write_frame(char *data, size_t size, int frame_id, int thread_id);
+
+int setup_detector(sls::Detector *det);
+int trigger_detector(sls::Detector *det);
+int close_detector(sls::Detector *det);
+
+int open_connection_card(int card_id);
+int exchange_magic_number(int sockfd);
+int close_connection_card(int card_id);
 
 #endif // JFWRITER_H_

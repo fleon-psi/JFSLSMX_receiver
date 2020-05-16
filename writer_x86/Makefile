@@ -47,7 +47,7 @@ LDFLAGS= -Ofast -g -static-intel -xHost -ip -llz4 -lm -lpthread -lz -libverbs -d
 CPPFLAGS= -I. -I../include -I${HDF5_PATH}/include $(SLS_DETECTOR_INCLUDE) $(SNAP_INCLUDE)
 EXECS=JFWriter
 
-WR_SRCS=JFWriter.o JFWriter_HDF5.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o
+WR_SRCS=NetIO.o JFWriter.o FileIO.o WriterThread.o DetConfig.o sharedVariables.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o
 
 all: JFWriter
 

@@ -772,3 +772,18 @@ int pack_data_hdf5() {
     }
     return 0;
 }
+
+// Save image data "as is" binary
+int write_frame(char *data, size_t size, int frame_id, int thread_id) {
+        char buff[12];
+        snprintf(buff,12,"%08d_%01d", frame_id, thread_id);
+        std::string prefix = "";
+        if (writer_settings.nlocations > 0)
+                prefix = writer_settings.data_location[frame_id % writer_settings.nlocations] + "/";
+        std::string filename = prefix + writer_settings.HDF5_prefix+"_"+std::string(buff) + ".img";
+        std::ofstream out_file(filename.c_str(), std::ios::binary | std::ios::out);
+        if (!out_file.is_open()) return 1;
+        out_file.write(data,size);
+        out_file.close();
+        return 0;
+}
