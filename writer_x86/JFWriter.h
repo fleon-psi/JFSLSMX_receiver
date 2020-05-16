@@ -92,7 +92,6 @@ extern pthread_mutex_t remaining_frames_mutex[NCARDS];
 int open_data_hdf5();
 int close_data_hdf5();
 int save_data_hdf(char *data, size_t size, size_t frame, int chunk);
-int save_gain_pedestal_hdf5();
 int save_master_hdf5();
 int pack_data_hdf5();
 

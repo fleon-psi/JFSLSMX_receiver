@@ -257,13 +257,8 @@ int main(int argc, char **argv) {
 #ifndef OFFLINE        
         close_detector(&det);
 #endif
-	if (writer_settings.HDF5_prefix != "") {
-
-		save_gain_pedestal_hdf5();
+	if (writer_settings.HDF5_prefix != "")
                 save_master_hdf5();
-        }
-	// Only save pedestal and gain, if filename provided
-        if (!writer_settings.write_hdf5) pack_data_hdf5();
 
         close_data_hdf5();
         std::cout << " <<< DONE >>> " << std::endl;

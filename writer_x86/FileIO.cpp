@@ -26,14 +26,13 @@ hid_t *data_hdf5_dataspace;
 
 pthread_mutex_t hdf5_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-int createDataChunkLink(std::string filename, hid_t location, std::string name) {
+int createDataChunkLink(std::string filename, hid_t location, std::string name, std::string remote) {
     std::string pure_filename;
     int pos = filename.rfind("/");
     if (pos != std::string::npos) {
-        herr_t status = H5Lcreate_external(filename.substr(pos+1).c_str(),"/entry/data/data",location,name.c_str(), H5P_DEFAULT, H5P_DEFAULT);
+        herr_t status = H5Lcreate_external(filename.substr(pos+1).c_str(), remote.c_str(),location,name.c_str(), H5P_DEFAULT, H5P_DEFAULT);
     } else {
-        herr_t status = H5Lcreate_external(filename.c_str(),"/entry/data/data",location,name.c_str(), H5P_DEFAULT, H5P_DEFAULT);
-
+        herr_t status = H5Lcreate_external(filename.c_str(), remote.c_str() ,location,name.c_str(), H5P_DEFAULT, H5P_DEFAULT);
     }
     return 0;
 }
@@ -77,6 +76,7 @@ hid_t createGroup(hid_t master_file_id, std::string group, std::string nxattr) {
 	return group_id;
 }
 
+// +Compress
 int saveUInt16_3D(hid_t location, std::string name, const uint16_t *val, int dim1, int dim2, int dim3, double multiplier) {
     herr_t status;
 
@@ -89,18 +89,31 @@ int saveUInt16_3D(hid_t location, std::string name, const uint16_t *val, int dim
     // Create the data space for the dataset.
     hid_t dataspace_id = H5Screate_simple(3, dims, NULL);
 
+    // Create data property
+    hid_t dcpl_id = H5Pcreate(H5P_DATASET_CREATE);
+    hsize_t chunk_size[3] = {dim1, dim2, dim3};
+    H5Pset_chunk(dcpl_id, 3, chunk_size);
+
+    // set filter
+    unsigned int params[] = {LZ4_BLOCK_SIZE, BSHUF_H5_COMPRESS_LZ4};                
+    status = H5Pset_filter(dcpl_id, (H5Z_filter_t)BSHUF_H5FILTER, H5Z_FLAG_MANDATORY, (size_t)2, params);
+    HDF5_ERROR(status,H5Pset_filter);
+
     // Create the dataset.
     hid_t dataset_id = H5Dcreate2(location, name.c_str(), H5T_STD_U16LE, dataspace_id,
-                                  H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+                                  dcpl_id, H5P_DEFAULT, H5P_DEFAULT);
 
     // Write the dataset.
     status = H5Dwrite(dataset_id, H5T_NATIVE_USHORT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
                       val);
+    HDF5_ERROR(status,H5Dwrite);
 
     addDoubleAttribute(dataset_id, "multiplier", &multiplier, 1);
 
     // End access to the dataset and release resources used by it.
     status = H5Dclose(dataset_id);
+
+    status = H5Pclose(dcpl_id);
 
     // Terminate access to the data space.
     status = H5Sclose(dataspace_id);
@@ -439,39 +452,6 @@ void write_metrology(hid_t master_file_id) {
 	}
 }
 
-int save_gain_pedestal_hdf5() {
-	// Define filename
-	std::string filename = "";
-	if (writer_settings.main_location != "") filename =
-			writer_settings.main_location + "/" +
-			writer_settings.HDF5_prefix + "_calibration.h5";
-	else filename = writer_settings.HDF5_prefix + "_calibration.h5";
-
-	// Create data file
-	hid_t hdf5_file = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-	if (hdf5_file < 0) {
-		std::cerr << "Cannot create file: " << filename << std::endl;
-		return 1;
-	}
-	hid_t grp = createGroup(hdf5_file, "/entry", "NXentry");
-	H5Gclose(grp);
-
-	grp = createGroup(hdf5_file, "/entry/adu_to_photon","");
-	saveUInt16_3D(grp, "G0", gain_pedestal.gainG0, 1024, 512, NMODULES * NCARDS, 1.0/(16384.0*512.0));
-	saveUInt16_3D(grp, "G1", gain_pedestal.gainG1, 1024, 512, NMODULES * NCARDS, -1.0/8192);
-	saveUInt16_3D(grp, "G2", gain_pedestal.gainG2, 1024, 512, NMODULES * NCARDS, -1.0/8192);
-	H5Gclose(grp);
-
-	grp = createGroup(hdf5_file, "/entry/pedestal_in_adu","");
-	saveUInt16_3D(grp, "G0", gain_pedestal.pedeG0, 1024, 512, NMODULES * NCARDS, 0.25);
-	saveUInt16_3D(grp, "G1", gain_pedestal.pedeG1, 1024, 512, NMODULES * NCARDS, 0.25);
-	saveUInt16_3D(grp, "G2", gain_pedestal.pedeG2, 1024, 512, NMODULES * NCARDS, 0.25);
-	H5Gclose(grp);
-
-        H5Fclose(hdf5_file);
-	return 0;
-}
-
 int save_master_hdf5() {
 	std::string filename = "";
 	if (writer_settings.main_location != "") filename =
@@ -497,7 +477,7 @@ int save_master_hdf5() {
             char buff[12];
 	    snprintf(buff,12,"data_%06d",i+1);
 	    std::string filename = writer_settings.HDF5_prefix + "_" + std::string(buff) + ".h5";
-            createDataChunkLink(filename, grp, std::string(buff));
+            createDataChunkLink(filename, grp, std::string(buff), "/entry/data/data");
         }
 	H5Gclose(grp);
 
@@ -529,29 +509,6 @@ int save_master_hdf5() {
 	saveDouble(grp, "incident_wavelength",12.4/experiment_settings.energy_in_keV,"angstrom");
 	H5Gclose(grp);
 
-        grp = createGroup(hdf5_file, "/entry/instrument/detector", "NXdetector");
-	saveDouble(grp,"beam_center_x",experiment_settings.beam_x, "pixel");
-	saveDouble(grp,"beam_center_y",experiment_settings.beam_y, "pixel");
-	saveDouble(grp,"count_time",experiment_settings.count_time, "s");
-	saveDouble(grp,"frame_time",experiment_settings.frame_time, "s");
-	saveDouble(grp,"detector_distance", experiment_settings.detector_distance / 1000.0, "m");
-	saveDouble(grp,"sensor_thickness", SENSOR_THICKNESS_IN_UM/1000000.0, "m");
-	saveDouble(grp,"x_pixel_size", PIXEL_SIZE_IN_UM/1000000.0, "m");
-	saveDouble(grp,"y_pixel_size", PIXEL_SIZE_IN_UM/1000000.0, "m");
-	saveString(grp,"sensor_material","Si");
-	saveString(grp,"description","PSI Jungfrau");
-        if (experiment_settings.pixel_depth == 2) {
-            saveInt(grp,"saturation_value", INT16_MAX-3);
-	    saveInt(grp,"underload_value", INT16_MIN+3);
-        } else {
-            saveInt(grp,"saturation_value", INT32_MAX-1);
-	    saveInt(grp,"underload_value", INT32_MIN+1);
-        }
-	H5Gclose(grp);
-
-        grp = createGroup(hdf5_file, "/entry/instrument/detector/geometry","NXgeometry");
-	H5Gclose(grp);
-
         grp = createGroup(hdf5_file, "/entry/sample","NXsample");
 	H5Gclose(grp);
 
@@ -562,15 +519,60 @@ int save_master_hdf5() {
 	grp = createGroup(hdf5_file, "/entry/sample/goniometer","NXtransformations");
         H5Gclose(grp);
 
+        hid_t det_grp = createGroup(hdf5_file, "/entry/instrument/detector", "NXdetector");
+	saveDouble(det_grp,"beam_center_x",experiment_settings.beam_x, "pixel");
+	saveDouble(det_grp,"beam_center_y",experiment_settings.beam_y, "pixel");
+	saveDouble(det_grp,"count_time",experiment_settings.count_time, "s");
+	saveDouble(det_grp,"frame_time",experiment_settings.frame_time, "s");
+	saveDouble(det_grp,"detector_distance", experiment_settings.detector_distance / 1000.0, "m");
+	saveDouble(det_grp,"sensor_thickness", SENSOR_THICKNESS_IN_UM/1000000.0, "m");
+	saveDouble(det_grp,"x_pixel_size", PIXEL_SIZE_IN_UM/1000000.0, "m");
+	saveDouble(det_grp,"y_pixel_size", PIXEL_SIZE_IN_UM/1000000.0, "m");
+	saveString(det_grp,"sensor_material","Si");
+	saveString(det_grp,"description","PSI Jungfrau");
+        saveInt(det_grp, "bit_depth_image", experiment_settings.pixel_depth * 8);
+        saveInt(det_grp, "bit_depth_readout", 16);
+        transform_and_write_mask(det_grp);        
+        if (experiment_settings.pixel_depth == 2) {
+            saveInt(det_grp,"saturation_value", INT16_MAX-10);
+	    saveInt(det_grp,"underload_value", INT16_MIN+10);
+        } else {
+            saveInt(det_grp,"saturation_value", INT32_MAX-1);
+	    saveInt(det_grp,"underload_value", INT32_MIN+1);
+        }
+
         grp = createGroup(hdf5_file, "/entry/instrument/detector/detectorSpecific","NXcollection");
-	saveDouble(grp,"photon_energy",experiment_settings.energy_in_keV,"eV");
+	saveDouble(grp,"photon_energy",experiment_settings.energy_in_keV * 1000.0,"eV");
 	saveInt(grp, "nimages",experiment_settings.nframes_to_write);
 	saveInt(grp, "ntrigger",1);
-//        saveInt(grp, " ", );
+        saveInt(grp, "nsummation", experiment_settings.summation);
+        saveInt(grp, "nimages_per_data_file" , writer_settings.images_per_file);
 	saveInt(grp, "x_pixels_in_detector", XPIXEL);
 	saveInt(grp, "y_pixels_in_detector", YPIXEL);
-        transform_and_write_mask(grp);        
+
+        if (writer_settings.compression == COMPRESSION_BSHUF_LZ4) saveString(grp,"compression","bslz4");
+        else if (writer_settings.compression == COMPRESSION_BSHUF_ZSTD) saveString(grp,"compression","bszstd");
+        else if (writer_settings.compression == COMPRESSION_NONE) saveString(grp,"compression","");
+
+        herr_t status = H5Lcreate_hard(det_grp, "pixel_mask", grp, "pixel_mask", H5P_DEFAULT, H5P_DEFAULT);
         H5Gclose(grp);
+	H5Gclose(det_grp);
+
+	grp = createGroup(hdf5_file, "/entry/instrument/detector/detectorSpecific/adu_to_photon","");
+	saveUInt16_3D(grp, "G0", gain_pedestal.gainG0, 1024, 512, NMODULES * NCARDS, 1.0/(16384.0*512.0));
+	saveUInt16_3D(grp, "G1", gain_pedestal.gainG1, 1024, 512, NMODULES * NCARDS, -1.0/8192);
+	saveUInt16_3D(grp, "G2", gain_pedestal.gainG2, 1024, 512, NMODULES * NCARDS, -1.0/8192);
+	H5Gclose(grp);
+
+	grp = createGroup(hdf5_file, "/entry/instrument/detector/detectorSpecific/pedestal_in_adu","");
+	saveUInt16_3D(grp, "G0", gain_pedestal.pedeG0, 1024, 512, NMODULES * NCARDS, 0.25);
+	saveUInt16_3D(grp, "G1", gain_pedestal.pedeG1, 1024, 512, NMODULES * NCARDS, 0.25);
+	saveUInt16_3D(grp, "G2", gain_pedestal.pedeG2, 1024, 512, NMODULES * NCARDS, 0.25);
+	H5Gclose(grp);
+
+
+        grp = createGroup(hdf5_file, "/entry/instrument/detector/geometry","NXgeometry");
+	H5Gclose(grp);
 
         write_metrology(hdf5_file);
 
