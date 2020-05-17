@@ -177,65 +177,17 @@ int parse_input(int argc, char **argv) {
 }
 
 int main(int argc, char **argv) {
-	int ret;
-
       	// Parse input
 	if (parse_input(argc, argv) == 1) exit(EXIT_FAILURE);
 
-        // Register HDF5 bitshuffle filter
-        H5Zregister(bshuf_H5Filter);
+        jfwriter_setup();
+        jfwriter_arm();
 
-	for (int i = 0; i < NCARDS; i++) {
-            setup_infiniband(i);
-            connect_to_power9(i);
-	    remaining_frames[i] = experiment_settings.nframes_to_write;
-	    pthread_mutex_init(&(remaining_frames_mutex[i]), NULL);
-	}
-
-        if (experiment_settings.conversion_mode == 255) {
-            exit(EXIT_SUCCESS);
-        }
-
-        // Configure detector
-#ifndef OFFLINE
-        sls::Detector det;
-        if (setup_detector(&det) == 1) exit(EXIT_FAILURE);
-#endif
-
-	pthread_t writer[writer_settings.nthreads];
-	writer_thread_arg_t writer_thread_arg[writer_settings.nthreads];
-
-        open_data_hdf5();
-
-        // Barrier #1 - All threads are set up running
-	for (int i = 0; i < NCARDS; i++)
-            exchange_magic_number(writer_connection_settings[i].sockfd);
-
-	if (experiment_settings.nframes_to_write > 0) {
-		for (int i = 0; i < writer_settings.nthreads; i++) {
-			writer_thread_arg[i].thread_id = i / NCARDS;
-                        if (NCARDS > 1) 
-			    writer_thread_arg[i].card_id = i % NCARDS;
-                        else
-                            writer_thread_arg[i].card_id = 0;
-			ret = pthread_create(&(writer[i]), NULL, writer_thread, &(writer_thread_arg[i]));
-		}
-                std::cout << "Threads started" << std::endl;
-        }
-
-        // Barrier #2 - All threads are set up running
-	for (int i = 0; i < NCARDS; i++)
-            exchange_magic_number(writer_connection_settings[i].sockfd);
-	
         auto start = std::chrono::system_clock::now();
 
-#ifndef OFFLINE
-        trigger_detector(&det);
-#endif
-	if (experiment_settings.nframes_to_write > 0) {
-		for (int i = 0; i < writer_settings.nthreads; i++)
-			ret = pthread_join(writer[i], NULL);
+        jfwriter_disarm();
 
+	if (experiment_settings.nframes_to_write > 0) {
 		auto end = std::chrono::system_clock::now();
 
 		std::chrono::duration<double> diff = end - start;
@@ -244,18 +196,7 @@ int main(int argc, char **argv) {
 		std::cout << "Compression ratio: " << ((double) total_compressed_size * 8) / ((double) NPIXEL * (double) NCARDS * (double) experiment_settings.nframes_to_write) << " bits/pixel" <<std::endl;
 	}
 
-        // Involves barrier after collecting data
-	for (int i = 0; i < NCARDS; i++) {
-            disconnect_from_power9(i);
-            close_infiniband(i);
-        }
+        jfwriter_close();
 
-#ifndef OFFLINE        
-        close_detector(&det);
-#endif
-	if (writer_settings.HDF5_prefix != "")
-                save_master_hdf5();
-
-        close_data_hdf5();
         std::cout << " <<< DONE >>> " << std::endl;
 }

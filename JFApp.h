@@ -35,6 +35,7 @@ struct experiment_settings_t {
         double   strong_pixel_value;
         uint16_t ntrigger;
         uint16_t delay_per_trigger;
+        bool     jf_full_speed;
 };
 
 struct receiver_output_t {

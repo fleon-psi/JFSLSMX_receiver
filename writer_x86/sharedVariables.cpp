@@ -16,6 +16,9 @@
 
 #include "JFWriter.h"
 
+pthread_t *writer = NULL;
+writer_thread_arg_t *writer_thread_arg = NULL;
+
 writer_settings_t writer_settings;
 gain_pedestal_t gain_pedestal;
 online_statistics_t online_statistics[NCARDS];
@@ -32,3 +35,5 @@ pthread_mutex_t total_compressed_size_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 uint64_t remaining_frames[NCARDS];
 pthread_mutex_t remaining_frames_mutex[NCARDS];
+
+sls::Detector *det;

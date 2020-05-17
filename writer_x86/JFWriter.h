@@ -21,9 +21,11 @@
 #include <Detector.h>
 
 #include "../JFApp.h"
-
 #define RDMA_RQ_SIZE 4096L // Maximum number of receive elements
 #define NCARDS       2
+
+#define YPIXEL                 (514L * NMODULES * NCARDS / 2)
+#define XPIXEL                 (2 * 1030L)
 
 #define LZ4_BLOCK_SIZE  0
 #define ZSTD_BLOCK_SIZE (8*514*1030)
@@ -73,6 +75,9 @@ struct gain_pedestal_t {
         uint16_t pixel_mask[NCARDS*NPIXEL];
 };
 
+extern pthread_t *writer;
+extern writer_thread_arg_t *writer_thread_arg;
+
 extern gain_pedestal_t gain_pedestal;
 extern online_statistics_t online_statistics[NCARDS];
 
@@ -89,17 +94,24 @@ extern pthread_mutex_t total_compressed_size_mutex;
 extern uint64_t remaining_frames[NCARDS];
 extern pthread_mutex_t remaining_frames_mutex[NCARDS];
 
+extern sls::Detector *det;
+
 int open_data_hdf5();
 int close_data_hdf5();
 int save_data_hdf(char *data, size_t size, size_t frame, int chunk);
 int save_master_hdf5();
 int pack_data_hdf5();
 
+int jfwriter_arm();
+int jfwriter_disarm();
+int jfwriter_setup();
+int jfwriter_close();
+
 int write_frame(char *data, size_t size, int frame_id, int thread_id);
 
-int setup_detector(sls::Detector *det);
-int trigger_detector(sls::Detector *det);
-int close_detector(sls::Detector *det);
+int setup_detector();
+int trigger_detector();
+int close_detector();
 
 int setup_infiniband(int card_id);
 int close_infiniband(int card_id);

@@ -38,21 +38,25 @@ SLS_DETECTOR_LIB=-L${SLS_DETECTOR_PATH}/build/bin/ -lSlsDetector -lSlsSupport
 
 HDF5_PATH=/opt/hdf5-1.10.5
 HDF5_LIBS=$(HDF5_PATH)/lib/libhdf5.a
+PISTACHE_PATH=/home/jungfrau/git/pistache/
+PISTACHE_LIB=$(PISTACHE_PATH)/build/src/libpistache.a
 
 CXX=icpc
 CC=icc
 CFLAGS=-g -std=c99 -Ofast -g -static-intel -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info
-CXXFLAGS= -std=c++11 -Ofast -g -static-intel -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info
+CXXFLAGS= -std=c++14 -Ofast -g -static-intel -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info
 LDFLAGS= -Ofast -g -static-intel -xHost -ip -llz4 -lm -lpthread -lz -libverbs -debug inline-debug-info -lssh
-CPPFLAGS= -I. -I../include -I${HDF5_PATH}/include $(SLS_DETECTOR_INCLUDE) $(SNAP_INCLUDE)
-EXECS=JFWriter
+CPPFLAGS= -I. -I../include -I${HDF5_PATH}/include -I$(PISTACHE_PATH)/include $(SLS_DETECTOR_INCLUDE) $(SNAP_INCLUDE)
 
-WR_SRCS=NetIO.o JFWriter.o FileIO.o WriterThread.o DetConfig.o sharedVariables.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o
+WR_SRCS=JFWriter_routines.o NetIO.o FileIO.o WriterThread.o DetConfig.o sharedVariables.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o
 
-all: JFWriter
+all: JFWriter RESTserver
 
-JFWriter: $(WR_SRCS)
-	$(CXX) $(WR_SRCS) -o JFWriter $(JF_LDLIBS) $(HDF5_LIBS) $(LDFLAGS) $(SLS_DETECTOR_LIB) -lzstd
+JFWriter: $(WR_SRCS) JFWriter.o
+	$(CXX) $(WR_SRCS) JFWriter.o -o JFWriter $(JF_LDLIBS) $(HDF5_LIBS) $(LDFLAGS) $(SLS_DETECTOR_LIB) -lzstd
+
+RESTserver: $(WR_SRCS) RESTserver.o
+	$(CXX) $(WR_SRCS) RESTserver.o -o RESTserver $(JF_LDLIBS) $(HDF5_LIBS) $(LDFLAGS) $(SLS_DETECTOR_LIB) $(PISTACHE_LIB) -lzstd
 
 clean:
 	rm -f *.o ../*.o ../bitshuffle/*.o JFWriter

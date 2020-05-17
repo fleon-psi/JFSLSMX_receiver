@@ -90,7 +90,7 @@ int trigger_omega() {
 }
 
 
-int setup_detector(sls::Detector *det) {
+int setup_detector() {
         det->stopDetector();
 
         det->setStartingFrameNumber(1);
@@ -99,12 +99,25 @@ int setup_detector(sls::Detector *det) {
             std::cerr << "Mismatch in detector size" << std::endl;
             return 1;
         }
-        experiment_settings.frame_time = det->getPeriod().squash().count() / (1000.0 * 1000.0 * 1000.0);
-        experiment_settings.count_time = det->getExptime().squash().count() / (1000.0 * 1000.0 * 1000.0);
-        std::cout << "JUNGFRAU Frame time: " << experiment_settings.frame_time << " s   Exp time:" << experiment_settings.count_time << " s" << std::endl;
-
-        if (experiment_settings.conversion_mode == MODE_PEDEG1) det->setSettings(slsDetectorDefs::detectorSettings::FORCESWITCHG1);
-        else if (experiment_settings.conversion_mode == MODE_PEDEG2) det->setSettings(slsDetectorDefs::detectorSettings::FORCESWITCHG2);
+        
+        if (experiment_settings.jf_full_speed) {
+            det->setSpeed(slsDetectorDefs::speedLevel::FULL_SPEED);
+            std::chrono::microseconds frame_time{500};
+            std::chrono::microseconds exp_time{470};
+            det->setPeriod(frame_time);
+            det->setExptime(exp_time);
+        } else {
+            det->setSpeed(slsDetectorDefs::speedLevel::HALF_SPEED);
+            std::chrono::microseconds frame_time{1000};
+            std::chrono::microseconds exp_time{970};
+            det->setPeriod(frame_time);
+            det->setExptime(exp_time);
+        }
+        
+        if (experiment_settings.conversion_mode == MODE_PEDEG1) 
+            det->setSettings(slsDetectorDefs::detectorSettings::FORCESWITCHG1);
+        else if (experiment_settings.conversion_mode == MODE_PEDEG2) 
+            det->setSettings(slsDetectorDefs::detectorSettings::FORCESWITCHG2);
         else det->setSettings(slsDetectorDefs::detectorSettings::DYNAMICGAIN);
 
         if (writer_settings.timing_trigger)
@@ -115,7 +128,7 @@ int setup_detector(sls::Detector *det) {
         return 0;
 }
 
-int trigger_detector(sls::Detector *det) {
+int trigger_detector() {
         if (writer_settings.timing_trigger) {
             det->startDetector();
             // sleep 200 ms is necessary for SNAP setup
@@ -129,7 +142,7 @@ int trigger_detector(sls::Detector *det) {
         return 0;
 }
 
-int close_detector(sls::Detector *det) {
+int close_detector() {
         det->stopDetector();
         det->setSettings(slsDetectorDefs::detectorSettings::DYNAMICGAIN);
         return 0;

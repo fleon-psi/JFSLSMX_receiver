@@ -13,8 +13,6 @@
 #define PIXEL_SIZE_IN_UM        75.0
 #define PIXEL_SIZE_IN_MM       (PIXEL_SIZE_IN_UM/1000.0)
 #define DETECTOR_NAME          "JF4M"
-#define YPIXEL                 (514L * NMODULES * NCARDS / 2)
-#define XPIXEL                 (2 * 1030L)
 
 #define HDF5_ERROR(ret,func) if (ret) printf("%s(%d) %s: err = %d\n",__FILE__,__LINE__, #func, ret), exit(ret)
 
