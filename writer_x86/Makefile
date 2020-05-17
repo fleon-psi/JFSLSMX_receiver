@@ -38,8 +38,8 @@ SLS_DETECTOR_LIB=-L${SLS_DETECTOR_PATH}/build/bin/ -lSlsDetector -lSlsSupport
 
 HDF5_PATH=/opt/hdf5-1.10.5
 HDF5_LIBS=$(HDF5_PATH)/lib/libhdf5.a
-PISTACHE_PATH=/home/jungfrau/git/pistache/
-PISTACHE_LIB=$(PISTACHE_PATH)/build/src/libpistache.a
+PISTACHE_PATH=../pistache/prefix
+PISTACHE_LIB=$(PISTACHE_PATH)/lib64/libpistache.a
 
 CXX=icpc
 CC=icc
