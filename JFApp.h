@@ -21,7 +21,9 @@ struct experiment_settings_t {
 	uint64_t nframes_to_write;
         uint64_t first_frame_number;
 	uint8_t  conversion_mode;
-	uint64_t pedestalG0_frames;
+	uint32_t pedestalG0_frames;
+	uint32_t pedestalG1_frames;
+	uint32_t pedestalG2_frames;
         uint32_t summation;
         size_t   pixel_depth;
 	double   energy_in_keV;
@@ -30,6 +32,7 @@ struct experiment_settings_t {
         double   detector_distance;
         double   count_time;
         double   frame_time;
+        double   beamline_time_margin;
         double   transmission;
         double   omega_angle_per_image;
         double   strong_pixel_value;
