@@ -26,7 +26,8 @@ uint32_t lastModuleFrameNumber() {
     for (int i = 1; i < NMODULES; i++) {
         if (online_statistics->head[i] < retVal) retVal = online_statistics->head[i];
     }
-    if (retVal >= experiment_settings.nframes_to_collect - 1) return UINT32_MAX; // All frames were collected
+    // if (retVal >= experiment_settings.nframes_to_collect - 1) return UINT32_MAX; // All frames were collected
+    // <-- This is done in FPGA image already
     return retVal;
 }
 
@@ -34,14 +35,14 @@ uint32_t lastModuleFrameNumber() {
 // Take half of the number, but only if not bad pixel/overload
 inline int16_t half16(int16_t in) {
     int16_t tmp = in;
-    if ((in > -32000) && (in < 32000)) tmp /= 2;
+    if ((in > INT16_MIN + 10) && (in > INT16_MAX - 10)) tmp /= 2;
     return tmp;
 }
 
 // Take quarter of the number, but only if not bad pixel/overload
 inline int16_t quarter16(int16_t in) {
     int16_t tmp = in;
-    if ((in > -32000) && (in < 32000)) tmp /= 4;
+    if ((in > INT16_MIN + 10) && (in < INT16_MAX - 10)) tmp /= 4;
     return tmp;
 }
 
@@ -186,10 +187,6 @@ void *run_poll_cq_thread(void *in_threadarg) {
 			pthread_exit(0);
 		}
 
-                // Copy frame to GPU
-//                if (receiver_settings.use_gpu && (experiment_settings.pixel_depth == 2))
-//                    copy_to_gpu(ib_buffer + COMPOSED_IMAGE_SIZE * experiment_settings.pixel_depth * ib_wc.wr_id, ib_buffer_occupancy[ib_wc.wr_id]);
-
 		pthread_mutex_lock(&ib_buffer_occupancy_mutex);
 		ib_buffer_occupancy[ib_wc.wr_id] = 0;
 		pthread_cond_signal(&ib_buffer_occupancy_cond);
@@ -201,24 +198,6 @@ void *run_poll_cq_thread(void *in_threadarg) {
 void *run_send_thread(void *in_threadarg) {
     ThreadArg *arg = (ThreadArg *) in_threadarg;
 
-    pthread_mutex_lock(&trigger_frame_mutex);
-//    if (experiment_settings.ntrigger > 0) trigger_frame = 0;
-//    else {
-        if (arg->ThreadID == 0) {
-    	    while (online_statistics->trigger_position < experiment_settings.pedestalG0_frames) usleep(1000);
-    	    trigger_frame = online_statistics->trigger_position;
-    	    pthread_cond_broadcast(&trigger_frame_cond);
-    	    std::cout << "Trigger observed at frame " << trigger_frame << std::endl;
-            // Put warning if trigger too late
-            if (experiment_settings.nframes_to_write * experiment_settings.summation + trigger_frame > experiment_settings.nframes_to_collect)
-            std::cerr << "WARNING: Trigger observed too late and some frames at the end of dataset will not be collected" << std::endl;
-        } else {
-    	    while (online_statistics->trigger_position < experiment_settings.pedestalG0_frames)
-    	    	pthread_cond_wait(&trigger_frame_cond, &trigger_frame_mutex);
-        }
-//    }
-    pthread_mutex_unlock(&trigger_frame_mutex);
-
     uint32_t current_frame_number = lastModuleFrameNumber();
 
     int current_gpu_slice = 0;
@@ -226,6 +205,7 @@ void *run_send_thread(void *in_threadarg) {
     		frame < experiment_settings.nframes_to_write;
     		frame += receiver_settings.compression_threads) {
         if (receiver_settings.use_gpu) {
+            // Synchronization of GPU part with GPU threads
             if (current_gpu_slice != frame / NFRAMES_PER_STREAM) {
                 int finished_cuda_stream = current_gpu_slice % (NCUDA_STREAMS*CUDA_TO_IB_BUFFER);
 
@@ -255,20 +235,23 @@ void *run_send_thread(void *in_threadarg) {
         if  (experiment_settings.pixel_depth == 2) buffer_id = frame % (RDMA_SQ_SIZE);
         else  buffer_id = frame % (RDMA_SQ_SIZE / 2);
 
+        // Make sure buffer is free
     	pthread_mutex_lock(&ib_buffer_occupancy_mutex);
 
-        while ((ib_buffer_occupancy[buffer_id] != 0))
+        while (ib_buffer_occupancy[buffer_id] != 0)
             pthread_cond_wait(&ib_buffer_occupancy_cond, &ib_buffer_occupancy_mutex);
 
     	pthread_mutex_unlock(&ib_buffer_occupancy_mutex);
 
         size_t collected_frame = frame*experiment_settings.summation + trigger_frame;
 
-        if (current_frame_number < (collected_frame+experiment_settings.summation-1) + 3) {
-    	// Ensure that all frames were already collected, if not wait 0.5 ms to try again
-    	    while (current_frame_number < (collected_frame+experiment_settings.summation-1) + 3) {
-                usleep(500);
-               current_frame_number = lastModuleFrameNumber();
+        if (current_frame_number < (collected_frame+experiment_settings.summation-1) + 2) {
+    	// Ensure that all frames were already collected, if not wait to try again
+    	    while (current_frame_number < (collected_frame+experiment_settings.summation-1) + 2) {
+                float delay_in_frames = (collected_frame+experiment_settings.summation-1) + 2 - current_frame_number;
+                if (delay_in_frames < 2) usleep(20);
+                else  usleep ((delay_in_frames-1)*experiment_settings.frame_time_detector*1000.0);
+                current_frame_number = lastModuleFrameNumber();
             }
         }
 
@@ -319,8 +302,8 @@ void *run_send_thread(void *in_threadarg) {
                         size_t pixel0_in = ((((collected_frame + j) % FRAME_BUF_SIZE) * NMODULES +  module) * MODULE_LINES + line ) * MODULE_COLS;
                         for (int col = 0; col < MODULE_COLS; col++) {
                             int16_t tmp = frame_buffer[pixel0_in + col];
-                            if (tmp < -32000) summed_buffer[col] = INT32_MIN;  
-                            if ((tmp > 32000) && (summed_buffer[col] != INT32_MIN)) summed_buffer[col] = INT32_MAX;
+                            if (tmp < INT16_MIN + 10) summed_buffer[col] = INT32_MIN;  
+                            if ((tmp > INT16_MAX - 10) && (summed_buffer[col] != INT32_MIN)) summed_buffer[col] = INT32_MAX;
                             if ((summed_buffer[col] != INT32_MIN) && (summed_buffer[col] != INT32_MAX)) summed_buffer[col] += tmp;  
                         }
                     }
@@ -339,7 +322,6 @@ void *run_send_thread(void *in_threadarg) {
             // For raw data, just copy contest of the buffer
             memcpy(ib_buffer + COMPOSED_IMAGE_SIZE * experiment_settings.pixel_depth * buffer_id,
                    frame_buffer + (collected_frame % FRAME_BUF_SIZE) * NPIXEL, NPIXEL * sizeof(uint16_t));
-
 
     	// Send the frame via RDMA
     	ibv_sge ib_sg;
@@ -364,10 +346,9 @@ void *run_send_thread(void *in_threadarg) {
         int ret;
     	while ((ret = ibv_post_send(ib_settings.qp, &ib_wr, &ib_bad_wr))) {
                 if (ret != ENOMEM)
-//    		std::cerr << "Sending with IB Verbs failed (ret: ENONEM buffer: " << buffer_id << " len: " << ib_sg.length << ")" << std::endl;
-//                else
-    		std::cerr << "Sending with IB Verbs failed (ret: " << ret << " buffer: " << buffer_id << " len: " << ib_sg.length << ")" << std::endl;
-                usleep(200);
+    		   std::cerr << "Sending with IB Verbs failed (ret: " << ret << " buffer: " << buffer_id << " len: " << ib_sg.length << ")" << std::endl;
+                // ENONEM error doesn't seem to be problematic
+                usleep(10);
     	}
     }
     std::cout << arg->ThreadID << ": Sending done" << std::endl;

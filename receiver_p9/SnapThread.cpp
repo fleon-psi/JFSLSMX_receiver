@@ -52,11 +52,9 @@ int setup_snap(uint32_t card_number) {
 #endif
 	card = snap_card_alloc_dev(device, SNAP_VENDOR_ID_IBM, SNAP_DEVICE_ID_SNAP);
 	if (card == NULL) {
-		std::cerr << "Failed to open card #" << card_number << " " << strerror(errno) << std::endl;
+		std::cerr << "FPGA: Failed to attach device " << device << " " << strerror(errno) << std::endl;
 		return 1;
 	}
-
-        std::cout << "Trying " << device << std::endl;
 
 	// Attach the action that will be used on the allocated card
 	action = snap_attach_action(card, ACTION_TYPE, action_irq, 60);
@@ -65,11 +63,11 @@ int setup_snap(uint32_t card_number) {
 		snap_action_assign_irq(action, ACTION_IRQ_SRC_LO);
 #endif
 	if (action == NULL) {
-		std::cerr << "Failed to attach action for card #" << card_number << " " << strerror(errno) << std::endl;
+		std::cerr << "FPGA: Failed to attach action to device " << device << " " << strerror(errno) << std::endl;
 		snap_card_free(card);
 		return 1;
 	}
-        std::cout << "CAPI FPGA card #" << card_number << " attached" << std::endl;
+        std::cout << "FPGA: device " << device << " attached" << std::endl;
 	return 0;
 }
 
@@ -80,23 +78,20 @@ void close_snap() {
 }
 
 void *run_snap_thread(void *in_threadarg) {
-        std::cout << "SNAP Thread: Started" << std::endl;
 	int rc = 0;
 
 	// Control register
 	struct snap_job cjob;
 	struct rx100G_job mjob;
 
-        mjob.first_frame_number = experiment_settings.first_frame_number;
+        mjob.first_frame_number = 1;
 	mjob.expected_frames    = experiment_settings.nframes_to_collect;
 	mjob.pedestalG0_frames  = experiment_settings.pedestalG0_frames;
 	mjob.mode               = experiment_settings.conversion_mode;
 	mjob.fpga_mac_addr      = receiver_settings.fpga_mac_addr;   // AA:BB:CC:DD:EE:F1
 	mjob.fpga_ipv4_addr     = receiver_settings.fpga_ip_addr;    // 10.1.50.5
-        mjob.expected_triggers  = 0;
-//        mjob.expected_triggers  = experiment_settings.ntrigger;
-//        if (experiment_settings.ntrigger > 0)
-//            mjob.frames_per_trigger = (experiment_settings.nframes_to_write * experiment_settings.summation) / experiment_settings.ntrigger;
+        mjob.expected_triggers  = experiment_settings.ntrigger;
+        mjob.frames_per_trigger = experiment_settings.nframes_to_write_per_trigger * experiment_settings.summation;
 
 	mjob.in_gain_pedestal_data_addr = (uint64_t) gain_pedestal_data;
 	mjob.out_frame_buffer_addr      = (uint64_t) frame_buffer;
@@ -106,8 +101,8 @@ void *run_snap_thread(void *in_threadarg) {
 	// Fill the stucture of data exchanged with the action
 	snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
 
-	std::cout << "SNAP Thread: Receiving can start" << std::endl;
-        std::cout << "IP address:" << receiver_settings.fpga_ip_addr / 256 / 256 / 256 << "." << (receiver_settings.fpga_ip_addr / 256 / 256) % 256 << "." << receiver_settings.fpga_ip_addr / 256 % 256 << "." << receiver_settings.fpga_ip_addr % 256 << std::endl;
+	std::cout << "FPGA: Receiving is starting" << std::endl;
+
 	// Call the action will:
 	//    write all the registers to the action (MMIO) 
 	//  + start the action 
@@ -115,18 +110,12 @@ void *run_snap_thread(void *in_threadarg) {
 	//  + read all the registers from the action (MMIO) 
 	rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
 
-	if (rc) std::cerr << "Action failed" << std::endl;
-        std::cout << "SNAP Thread: action done" << std::endl;
-	__hexdump(stdout, online_statistics, 20*4*128/8+128);
+	if (rc) std::cerr << "FPGA: Action failed" << std::endl;
 
-	__hexdump(stdout, status_buffer + 128 + (experiment_settings.nframes_to_collect - 20) * 4 * 128/8 , 24*4*128/8);
-
-        // Reset Ethernet CMAC
-	std::cout << "SNAP Thread: Resetting 100G CMAC" << std::endl;
 	mjob.mode = MODE_RESET;
 	snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
 
 	rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
-        std::cout << "All done" << std::endl;
+        std::cout << "FPGA: All done" << std::endl;
 	pthread_exit(0);
 }
