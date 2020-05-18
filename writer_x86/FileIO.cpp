@@ -541,9 +541,11 @@ int save_master_hdf5() {
 
         grp = createGroup(hdf5_file, "/entry/instrument/detector/detectorSpecific","NXcollection");
 	saveDouble(grp,"photon_energy",experiment_settings.energy_in_keV * 1000.0,"eV");
-	saveInt(grp, "nimages",experiment_settings.nframes_to_write);
-	saveInt(grp, "ntrigger",1);
-        saveInt(grp, "nsummation", experiment_settings.summation);
+	saveInt(grp, "nimages",    experiment_settings.nframes_to_write_per_trigger);
+	saveInt(grp, "ntrigger",   experiment_settings.ntrigger);
+        saveInt(grp, "internal_summation", experiment_settings.summation);
+        saveDouble(grp, "internal_frame_time", experiment_settings.frame_time_detector, "s");
+        saveDouble(grp, "internal_count_time", experiment_settings.count_time_detector, "s");
         saveInt(grp, "nimages_per_data_file" , writer_settings.images_per_file);
 	saveInt(grp, "x_pixels_in_detector", XPIXEL);
 	saveInt(grp, "y_pixels_in_detector", YPIXEL);

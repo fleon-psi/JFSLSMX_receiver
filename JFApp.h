@@ -17,28 +17,36 @@
 
 // Settings exchanged between writer and receiver
 struct experiment_settings_t {
+	uint8_t  conversion_mode;
+
 	uint64_t nframes_to_collect;
 	uint64_t nframes_to_write;
-        uint64_t first_frame_number;
-	uint8_t  conversion_mode;
+	uint64_t nframes_to_write_per_trigger;
+        uint16_t ntrigger;
+
 	uint32_t pedestalG0_frames;
 	uint32_t pedestalG1_frames;
 	uint32_t pedestalG2_frames;
         uint32_t summation;
-        size_t   pixel_depth;
-	double   energy_in_keV;
-        double   beam_x;
-        double   beam_y;
-        double   detector_distance;
-        double   count_time;
-        double   frame_time;
-        double   beamline_time_margin;
-        double   transmission;
-        double   omega_angle_per_image;
-        double   strong_pixel_value;
-        uint16_t ntrigger;
-        uint16_t delay_per_trigger;
+
         bool     jf_full_speed;
+        double   count_time;            // in s Beamline
+        double   frame_time;            // in s Beamline
+        double   frame_time_detector;   // in s Detector
+	double   count_time_detector;   // in s Detector
+        size_t   pixel_depth;           // in byte
+
+	double   energy_in_keV;         // in keV
+        double   beam_x;                // in pixel
+        double   beam_y;                // in pixel
+        double   detector_distance;     // in mm
+        double   transmission;          // 1.0 = full transmission
+        double   omega_angle_per_image; // in degrees
+
+        double   beamline_delay; // in seconds delay between arm succeed and trigger opening (maximal)
+        double   shutter_delay;  // in seconds delay between trigger and shutter
+
+        double   strong_pixel_value;
 };
 
 struct receiver_output_t {

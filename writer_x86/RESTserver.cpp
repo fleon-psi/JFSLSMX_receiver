@@ -2,6 +2,7 @@
 #include <pistache/router.h>
 #include <iostream>
 #include <map>
+#include <cmath>
 
 #include "../json/single_include/nlohmann/json.hpp"
 
@@ -10,55 +11,37 @@
 #define API_VERSION "jf-0.1.0"
 #define KEV_OVER_ANGSTROM 12.398
 
-// TODO: Wrong parameters should raise errors
-
-void detector_command(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
-    auto command = request.param(":command").as<std::string>();
-    if (command == "arm") {
-        // Arm
-        response.send(Pistache::Http::Code::Ok);
-    } else if (command == "disarm") {
-        // Disarm
-        response.send(Pistache::Http::Code::Ok);
-    } else if (command == "cancel") {
-        // Disarm
-        response.send(Pistache::Http::Code::Ok);
-    } else if (command == "abort") {
-        // Disarm
-        response.send(Pistache::Http::Code::Ok);
-    } else if (command == "status_update") {
-        // Status update
-        response.send(Pistache::Http::Code::Ok);
-    } else if (command == "initialize") {
-        // Init
-        response.send(Pistache::Http::Code::Ok);
-    } else if (command == "measure") {
-        // Arm + Disarm
-        response.send(Pistache::Http::Code::Ok);
-    } else
-        response.send(Pistache::Http::Code::Not_Found);
-}
-
+enum simplon_state_t {STATE_READY, STATE_ACQUIRE, STATE_ERROR} simplon_state;
 void update_summation() {
     if (experiment_settings.jf_full_speed) {
-        experiment_settings.summation = (int) (experiment_settings.frame_time / 0.0005);
-        experiment_settings.frame_time = experiment_settings.summation * 0.0005;
-        experiment_settings.count_time = experiment_settings.summation * 0.00047;
+        experiment_settings.frame_time_detector = 0.0005;
+        experiment_settings.count_time_detector = 0.00047;
     } else {
-        experiment_settings.summation = (int) (experiment_settings.frame_time / 0.001);
-        experiment_settings.frame_time = experiment_settings.summation * 0.001;
-        experiment_settings.count_time = experiment_settings.summation * 0.00097;
+        experiment_settings.frame_time_detector = 0.001;
+        experiment_settings.count_time_detector = 0.00097;
     }
+    
+    experiment_settings.summation = std::lround(experiment_settings.frame_time / experiment_settings.frame_time_detector);
+
+    // Summation
     if (experiment_settings.summation == 0) experiment_settings.summation = 1; 
+
+    experiment_settings.frame_time = experiment_settings.frame_time_detector * experiment_settings.summation;
+    experiment_settings.count_time = experiment_settings.count_time_detector * experiment_settings.summation;
+
     if (experiment_settings.summation == 1) experiment_settings.pixel_depth = 2;
     else experiment_settings.pixel_depth = 4;
 
+    experiment_settings.nframes_to_write = experiment_settings.nframes_to_write_per_trigger * experiment_settings.ntrigger;
+
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG0_frames 
-        + experiment_settings.summation * experiment_settings.nframes_to_write 
-        + experiment_settings.beamline_time_margin / ((experiment_settings.jf_full_speed)? 0.0005 : 0.001);
+        + experiment_settings.summation * experiment_settings.nframes_to_write
+        + experiment_settings.beamline_delay / experiment_settings.frame_time_detector
+        + experiment_settings.shutter_delay * experiment_settings.ntrigger / experiment_settings.frame_time_detector;
 }
 
 void default_parameters() {
+    simplon_state = STATE_READY;
     experiment_settings.jf_full_speed = false;
     experiment_settings.summation = 1;
     experiment_settings.pixel_depth = 2;
@@ -89,47 +72,122 @@ void default_parameters() {
     update_summation();
 }
 
+// TODO: Wrong parameters should raise errors
+void detector_command(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    auto command = request.param(":command").as<std::string>();
+    if (command == "arm") {
+        if (simplon_state == STATE_READY) {
+        // Arm
+            std::cout << "Frames to collect:    " << experiment_settings.nframes_to_collect << std::endl;
+            std::cout << "Frames to write:      " << experiment_settings.nframes_to_write << std::endl;
+            std::cout << "Conversion mode:      " << (uint32_t) experiment_settings.conversion_mode << std::endl;
+            std::cout << "Summation:            " << experiment_settings.summation << std::endl;
+            std::cout << "Pixel depth:          " << experiment_settings.pixel_depth << std::endl;
+            std::cout << "Pedestal G0 frames:   " << experiment_settings.pedestalG0_frames << std::endl;
+            std::cout << "Pedestal G1 frames:   " << experiment_settings.pedestalG1_frames << std::endl;
+            std::cout << "Pedestal G2 frames:   " << experiment_settings.pedestalG2_frames << std::endl;
+            std::cout << "Ntrigger:             " << experiment_settings.ntrigger << std::endl;
+            std::cout << "Count time:           " << experiment_settings.count_time << std::endl;
+            std::cout << "Frame time:           " << experiment_settings.frame_time << std::endl;
+            std::cout << "Beamline delay:       " << experiment_settings.beamline_delay << std::endl;
+            std::cout << "Shutter delay:        " << experiment_settings.shutter_delay << std::endl;
+            std::cout << "Full speed:           " << experiment_settings.jf_full_speed << std::endl;
+            std::cout << "Name pattern:         " << writer_settings.HDF5_prefix << std::endl;
+            simplon_state = STATE_ACQUIRE;
+            response.send(Pistache::Http::Code::Ok);
+        } else {
+            response.send(Pistache::Http::Code::Bad_Request);
+        }
+    } else if (command == "disarm") {
+        if (simplon_state == STATE_ACQUIRE) {
+            std::cout << "Disarm" << std::endl;
+            // Disarm
+            response.send(Pistache::Http::Code::Ok);
+        } else {
+            response.send(Pistache::Http::Code::Bad_Request);
+        }
+    } else if (command == "cancel") {
+        if (simplon_state == STATE_ACQUIRE) {
+            std::cout << "Disarm" << std::endl;
+            // Disarm
+            response.send(Pistache::Http::Code::Ok);
+        } else {
+            response.send(Pistache::Http::Code::Bad_Request);
+        }
+    } else if (command == "abort") {
+        if (simplon_state == STATE_ACQUIRE) {
+            std::cout << "Disarm" << std::endl;
+            // Disarm
+            response.send(Pistache::Http::Code::Ok);
+        } else {
+            response.send(Pistache::Http::Code::Bad_Request);
+        }
+
+    } else if (command == "status_update") {
+        // Status update
+        response.send(Pistache::Http::Code::Ok);
+    } else if (command == "initialize") {
+        std::cout << "Initialize" << std::endl;
+        if (simplon_state == STATE_ACQUIRE) {
+            std::cout << "Disarm" << std::endl;
+            // Disarm
+        }
+        default_parameters();
+        // Init
+        response.send(Pistache::Http::Code::Ok);
+    } else
+        response.send(Pistache::Http::Code::Not_Found);
+}
+
 void detector_set(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    if (simplon_state != STATE_READY) {
+        response.send(Pistache::Http::Code::Bad_Request);
+        return;
+    }
+
     std::string variable = request.param(":variable").as<std::string>();
     nlohmann::json json_input = nlohmann::json::parse(request.body());
     nlohmann::json json_output;
 
-    std::cout << "Setting: " << variable << "=" << json_input["value"] << std::endl;
-
     if (variable == "wavelength") experiment_settings.energy_in_keV = KEV_OVER_ANGSTROM / json_input["value"].get<float>();
-    if (variable == "photon_energy") experiment_settings.energy_in_keV = json_input["value"].get<float>() / 1000.0;
-    if (variable == "nimages") experiment_settings.nframes_to_write = json_input["value"].get<int>();
-    if (variable == "ntrigger") experiment_settings.ntrigger = json_input["value"].get<int>();
+    else if (variable == "photon_energy") experiment_settings.energy_in_keV = json_input["value"].get<float>() / 1000.0;
+    else if (variable == "nimages") experiment_settings.nframes_to_write_per_trigger = json_input["value"].get<int>();
+    else if (variable == "ntrigger") experiment_settings.ntrigger = json_input["value"].get<int>();
 
-    if (variable == "beam_center_x") experiment_settings.beam_x = json_input["value"].get<float>();
-    if (variable == "beam_center_y") experiment_settings.beam_y = json_input["value"].get<float>();
-    if (variable == "detector_distance") experiment_settings.detector_distance = json_input["value"].get<float>();
-    if (variable == "omega_increment") experiment_settings.omega_angle_per_image = json_input["value"].get<float>();
-    if (variable == "beamline_time_margin") experiment_settings.beamline_time_margin = json_input["value"].get<float>();
+    else if (variable == "beam_center_x") experiment_settings.beam_x = json_input["value"].get<float>();
+    else if (variable == "beam_center_y") experiment_settings.beam_y = json_input["value"].get<float>();
+    else if (variable == "detector_distance") experiment_settings.detector_distance = json_input["value"].get<float>();
+    else if (variable == "omega_increment") experiment_settings.omega_angle_per_image = json_input["value"].get<float>();
 
-    if (variable == "compression") {
+    else if (variable == "beamline_delay") experiment_settings.beamline_delay = json_input["value"].get<float>();
+    else if (variable == "shutter_delay") experiment_settings.shutter_delay = json_input["value"].get<float>();
+
+    else if (variable == "compression") {
         if (json_input["value"].get<std::string>() == "bslz4") writer_settings.compression = COMPRESSION_BSHUF_LZ4;
         else if (json_input["value"].get<std::string>() == "bszstd") writer_settings.compression = COMPRESSION_BSHUF_ZSTD;
         else writer_settings.compression = COMPRESSION_NONE;
     }
 
-    if (variable == "speed") {
+    else if (variable == "speed") {
         if (json_input["value"].get<std::string>() == "full") experiment_settings.jf_full_speed = true; 
         if (json_input["value"].get<std::string>() == "half") experiment_settings.jf_full_speed = false;
     }
 
-    if (variable == "mode") {
+    else if (variable == "mode") {
         if (json_input["value"].get<std::string>() == "converted") experiment_settings.conversion_mode = MODE_CONV;
         if (json_input["value"].get<std::string>() == "raw") experiment_settings.conversion_mode = MODE_RAW;
         if (json_input["value"].get<std::string>() == "pedestalG1") experiment_settings.conversion_mode = MODE_PEDEG1;
         if (json_input["value"].get<std::string>() == "pedestalG2") experiment_settings.conversion_mode = MODE_PEDEG2;
     }
 
-    if (variable == "frame_time") experiment_settings.frame_time = json_input["value"].get<float>();
-    if (variable == "pedestalG0_frames") experiment_settings.pedestalG0_frames = json_input["value"].get<int>();
-    if (variable == "pedestalG1_frames") experiment_settings.pedestalG1_frames = json_input["value"].get<int>();
-    if (variable == "pedestalG2_frames") experiment_settings.pedestalG2_frames = json_input["value"].get<int>();
-    
+    else if (variable == "frame_time") experiment_settings.frame_time = json_input["value"].get<float>();
+    else if (variable == "pedestalG0_frames") experiment_settings.pedestalG0_frames = json_input["value"].get<int>();
+    else if (variable == "pedestalG1_frames") experiment_settings.pedestalG1_frames = json_input["value"].get<int>();
+    else if (variable == "pedestalG2_frames") experiment_settings.pedestalG2_frames = json_input["value"].get<int>();
+    else {
+	 response.send(Pistache::Http::Code::Not_Found, "Key " + variable + " doesn't exists");
+         return;
+    }
     update_summation();
     response.send(Pistache::Http::Code::Ok, json_output.dump(), MIME(Application, Json));
 }
@@ -139,48 +197,62 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
     nlohmann::json j;
 
     if (variable == "wavelength") {j["value"] = KEV_OVER_ANGSTROM/experiment_settings.energy_in_keV; j["value_type"] = "float"; j["unit"] = "Angstrom";}
-    if (variable == "photon_energy") {j["value"] = experiment_settings.energy_in_keV*1000.0; j["value_type"] = "float"; j["unit"] = "eV";}
-    if (variable == "x_pixel_size") {j["value"] = 0.075; j["value_type"] = "float"; j["unit"] = "mm";}
-    if (variable == "y_pixel_size") {j["value"] = 0.075; j["value_type"] = "float"; j["unit"] = "mm";}
-    if (variable == "beam_center_x") {j["value"] = experiment_settings.beam_x; j["value_type"] = "float"; j["unit"] = "pixel";}
-    if (variable == "beam_center_y") {j["value"] = experiment_settings.beam_y; j["value_type"] = "float"; j["unit"] = "pixel";}
-    if (variable == "detector_distance") {j["value"] = experiment_settings.detector_distance; j["value_type"] = "float"; j["unit"] = "mm";}
-    if (variable == "x_pixels_in_detector") {j["value"] = XPIXEL; j["value_type"] = "uint";}
-    if (variable == "y_pixels_in_detector") {j["value"] = YPIXEL; j["value_type"] = "uint";}
-    if (variable == "bit_depth_image") {j["value"] = experiment_settings.pixel_depth*8; j["value_type"] = "uint";}
-    if (variable == "bit_depth_readout") {j["value"] = 16; j["value_type"] = "uint";}
-    if (variable == "description") {j["value"] = "JUNGFRAU 4M"; j["value_type"] = "string";}
-    if (variable == "summation") {j["value"] = experiment_settings.summation; j["value_type"] = "string";}
-    if (variable == "roi_mode") {j["value"] = "disabled"; j["value_type"] = "string"; j["allowed_values"] ={"disabled"};}
-    if (variable == "frame_time") {j["value"] = experiment_settings.frame_time; j["value_type"] = "float"; j["unit"] ={"s"};}
-    if (variable == "count_time") {j["value"] = experiment_settings.count_time; j["value_type"] = "float"; j["unit"] ={"s"};}
+    else if (variable == "photon_energy") {j["value"] = experiment_settings.energy_in_keV*1000.0; j["value_type"] = "float"; j["unit"] = "eV";}
+    else if (variable == "x_pixel_size") {j["value"] = 0.075; j["value_type"] = "float"; j["unit"] = "mm";}
+    else if (variable == "y_pixel_size") {j["value"] = 0.075; j["value_type"] = "float"; j["unit"] = "mm";}
+    else if (variable == "beam_center_x") {j["value"] = experiment_settings.beam_x; j["value_type"] = "float"; j["unit"] = "pixel";}
+    else if (variable == "beam_center_y") {j["value"] = experiment_settings.beam_y; j["value_type"] = "float"; j["unit"] = "pixel";}
+    else if (variable == "detector_distance") {j["value"] = experiment_settings.detector_distance; j["value_type"] = "float"; j["unit"] = "mm";}
+    else if (variable == "x_pixels_in_detector") {j["value"] = XPIXEL; j["value_type"] = "uint";}
+    else if (variable == "y_pixels_in_detector") {j["value"] = YPIXEL; j["value_type"] = "uint";}
+    else if (variable == "bit_depth_image") {j["value"] = experiment_settings.pixel_depth*8; j["value_type"] = "uint";}
+    else if (variable == "bit_depth_readout") {j["value"] = 16; j["value_type"] = "uint";}
+    else if (variable == "description") {j["value"] = "JUNGFRAU 4M"; j["value_type"] = "string";}
+    else if (variable == "summation") {j["value"] = experiment_settings.summation; j["value_type"] = "string";}
+    else if (variable == "roi_mode") {j["value"] = "disabled"; j["value_type"] = "string"; j["allowed_values"] ={"disabled"};}
+    else if (variable == "frame_time") {j["value"] = experiment_settings.frame_time; j["value_type"] = "float"; j["unit"] ={"s"};}
+    else if (variable == "count_time") {j["value"] = experiment_settings.count_time; j["value_type"] = "float"; j["unit"] ={"s"};}
 
     // JF specific
-    if (variable == "beamline_time_margin") {j["value"] = experiment_settings.beamline_time_margin; j["value_type"] = "float"; j["unit"] = "s";}
-    if (variable == "pedestalG0_frames") {j["value"] = experiment_settings.pedestalG0_frames; j["value_type"] = "uint";}
-    if (variable == "pedestalG1_frames") {j["value"] = experiment_settings.pedestalG1_frames; j["value_type"] = "uint";}
-    if (variable == "pedestalG2_frames") {j["value"] = experiment_settings.pedestalG2_frames; j["value_type"] = "uint";}
-    if (variable == "speed") {j["value"] = experiment_settings.jf_full_speed? "full":"half"; j["value_type"] = "string"; j["allowed_values"] ={"full", "half"};}
-    if (variable == "mode") {
+    else if (variable == "beamline_delay") {j["value"] = experiment_settings.beamline_delay; j["value_type"] = "float"; j["unit"] = "s";}
+    else if (variable == "shutter_delay") {j["value"] = experiment_settings.shutter_delay; j["value_type"] = "float"; j["unit"] = "s";}
+    else if (variable == "pedestalG0_frames") {j["value"] = experiment_settings.pedestalG0_frames; j["value_type"] = "uint";}
+    else if (variable == "pedestalG1_frames") {j["value"] = experiment_settings.pedestalG1_frames; j["value_type"] = "uint";}
+    else if (variable == "pedestalG2_frames") {j["value"] = experiment_settings.pedestalG2_frames; j["value_type"] = "uint";}
+    else if (variable == "speed") {j["value"] = experiment_settings.jf_full_speed? "full":"half"; j["value_type"] = "string"; j["allowed_values"] ={"full", "half"};}
+    else if (variable == "mode") {
         j["value_type"] = "string"; j["allowed_values"] ={"converted", "raw", "pedestalG1", "pedestalG2"};
         if (experiment_settings.conversion_mode == MODE_CONV) j["value"] = "converted";
         if (experiment_settings.conversion_mode == MODE_RAW) j["value"] = "raw";
         if (experiment_settings.conversion_mode == MODE_PEDEG1) j["value"] = "pedestalG1";
         if (experiment_settings.conversion_mode == MODE_PEDEG2) j["value"] = "pedestalG2";
     }
+    else {
+	 response.send(Pistache::Http::Code::Not_Found, "Key " + variable + " doesn't exists");
+         return;
+    }
+
     response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));
 }
 
 void filewriter_set(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    if (simplon_state != STATE_READY) {
+        response.send(Pistache::Http::Code::Bad_Request);
+        return;
+    }
+
     auto variable = request.param(":variable").as<std::string>();
     nlohmann::json json_input = nlohmann::json::parse(request.body());
     nlohmann::json json_output;
 
     if (variable == "nimages_per_file") writer_settings.images_per_file = json_input["value"].get<int>();
-    if (variable == "name_pattern") writer_settings.HDF5_prefix = json_input["value"].get<std::string>();
-    if (variable == "format") { 
+    else if (variable == "name_pattern") writer_settings.HDF5_prefix = json_input["value"].get<std::string>();
+    else if (variable == "format") { 
         if (json_input["value"].get<std::string>() == "binary") writer_settings.write_hdf5 = false;
         if (json_input["value"].get<std::string>() == "hdf5") writer_settings.write_hdf5 = true;
+    } else {
+	 response.send(Pistache::Http::Code::Not_Found, "Key " + variable + " doesn't exists");
+         return;
     }
     response.send(Pistache::Http::Code::Ok, json_output.dump(), MIME(Application, Json));
 }
@@ -196,11 +268,25 @@ void hello(const Pistache::Rest::Request& request, Pistache::Http::ResponseWrite
 }
 
 void detector_state(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    nlohmann::json j;
+    switch (simplon_state) {
+        case STATE_READY:
+            j = {"ready"};
+            break;
+        case STATE_ACQUIRE:
+            j = {"acquire"};
+            break;
+        case STATE_ERROR:
+            j = {"error"};
+            break;
+    }
+    response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));            
 }
 
 int main() {
-
     default_parameters();
+
+    jfwriter_setup();
 
     Pistache::Address addr(Pistache::Ipv4::any(), Pistache::Port(5232));
 
