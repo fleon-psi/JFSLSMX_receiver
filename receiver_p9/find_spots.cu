@@ -8,13 +8,13 @@
 #include <pthread.h>
 #include "JFReceiver.h"
 
-#define MAX_STRONG 8192
+#define MAX_STRONG 8192L
 
 #define NBX 3
 #define NBY 3
 
-#define COLS (2*1030)
-#define LINES (514)
+#define COLS (2*1030L)
+#define LINES (514L)
 
 #define FRAME_SIZE ((NMODULES/2) * COLS * LINES * sizeof(int16_t))
 
@@ -28,15 +28,16 @@ struct strong_pixel {
 
 
 // GPU kernel to find strong pixels
-__global__ void find_spots_colspot(int16_t *in, strong_pixel *out, float strong, int N) {
+template<typename T>
+__global__ void find_spots_colspot(T *in, strong_pixel *out, float strong, int N) {
      if (blockIdx.x * blockDim.x + threadIdx.x < N) {
         // Threshold for signal^2 / var
         // To avoid division (see later) N/(N-1) factor is included already in the threshold
         float threshold = strong * strong * (float)((2*NBX+1) * (2*NBY+1)) / (float) ((2*NBX+1) * (2*NBY+1)-1);
 
-        // One thread is 512 lines or 1 module
+        // One thread is 514 lines or 2 modules (in 2x2 configuration)
         // line0 points to the module/frame
-        size_t line0 = (blockIdx.x * blockDim.x + threadIdx.x) * 512L;
+        size_t line0 = (blockIdx.x * blockDim.x + threadIdx.x) * LINES;
 
         // Location of the first strong pixel in the output array 
         size_t strong_id0 = (blockIdx.x * blockDim.x + threadIdx.x) * MAX_STRONG;
@@ -156,6 +157,14 @@ int setup_gpu(int device) {
     }
     std::cout << "GPU: setup done" << std::endl;
 
+    // Setup synchronization
+    for (int i = 0; i < NCUDA_STREAMS*CUDA_TO_IB_BUFFER; i++) {
+            pthread_mutex_init(cuda_stream_ready_mutex+i, NULL);
+            pthread_cond_init(cuda_stream_ready_cond+i, NULL);
+            pthread_mutex_init(writer_threads_done_mutex+i, NULL);
+            pthread_cond_init(writer_threads_done_cond+i, NULL);
+    }
+
     return 0;
 }
 
@@ -165,6 +174,15 @@ int close_gpu() {
     cudaError_t err = cudaHostUnregister(ib_buffer);
     for (int i = 0; i < NCUDA_STREAMS; i++)
         err = cudaStreamDestroy(stream[i]);
+
+    // Setup synchronization
+    for (int i = 0; i < NCUDA_STREAMS*CUDA_TO_IB_BUFFER; i++) {
+            pthread_mutex_destroy(cuda_stream_ready_mutex+i);
+            pthread_cond_destroy(cuda_stream_ready_cond+i);
+            pthread_mutex_destroy(writer_threads_done_mutex+i);
+            pthread_cond_destroy(writer_threads_done_cond+i);
+    }
+
     return 0;
 }
 
@@ -298,11 +316,11 @@ void *run_gpu_thread(void *in_threadarg) {
 
          pthread_mutex_lock(writer_threads_done_mutex+ib_slice);
          // Wait till everyone is done
-         while (writer_threads_done[ib_slice] > 0)
+         while (writer_threads_done[ib_slice] < receiver_settings.compression_threads)
              pthread_cond_wait(writer_threads_done_cond+ib_slice, 
                                writer_threads_done_mutex+ib_slice);
          // Restore full values and continue
-         writer_threads_done[ib_slice] = receiver_settings.compression_threads;
+         writer_threads_done[ib_slice] = 0;
          pthread_mutex_unlock(writer_threads_done_mutex+ib_slice);
 
          // Here all writting is done, but it is guarranteed not be overwritten
@@ -310,20 +328,20 @@ void *run_gpu_thread(void *in_threadarg) {
 
          // Copy frames to GPU memory
          cudaError_t err;
-         err = cudaMemcpyAsync(gpu_data16 + gpu_slice * NFRAMES_PER_STREAM * FRAME_SIZE, 
-               ib_buffer + ib_slice * FRAME_SIZE,
+         err = cudaMemcpyAsync(gpu_data16 + (gpu_slice % NCUDA_STREAMS) * NFRAMES_PER_STREAM * FRAME_SIZE / sizeof(uint16_t), 
+               ib_buffer + ib_slice * NFRAMES_PER_STREAM * FRAME_SIZE,
                frames * FRAME_SIZE,
                cudaMemcpyHostToDevice, stream[gpu_slice]);
          if (err != cudaSuccess) {
-             std::cout << "GPU: memory copy error" << std::endl;
+             std::cout << "GPU: memory copy error for slice " << gpu_slice << "/" << ib_slice << "frames: " << frames << "(" << cudaGetErrorString(err) << ")" << std::endl;
              pthread_exit(0);
          }
 
          cudaEventRecord (event_mem_copied, stream[gpu_slice]);
 
          // Start GPU kernel
-         find_spots_colspot<<<NFRAMES_PER_STREAM * 2 / 32, 32, 0, stream[gpu_slice]>>> 
-                 (gpu_data16 + gpu_slice * NFRAMES_PER_STREAM * FRAME_SIZE, 
+         find_spots_colspot<int16_t> <<<NFRAMES_PER_STREAM * 2 / 32, 32, 0, stream[gpu_slice]>>> 
+                 (gpu_data16 + gpu_slice * NFRAMES_PER_STREAM * FRAME_SIZE / 2, 
                   gpu_out + gpu_slice * NFRAMES_PER_STREAM * 2 * MAX_STRONG, 
                   experiment_settings.strong_pixel_value, frames * 2);
 
@@ -334,9 +352,9 @@ void *run_gpu_thread(void *in_threadarg) {
              pthread_exit(0);
          }
 
-         // Broadcast to everyone waiting, that buffer can be overwritten
+         // Broadcast to everyone waiting, that buffer can be overwritten by next iteration
          pthread_mutex_lock(cuda_stream_ready_mutex+ib_slice);
-         cuda_stream_ready[ib_slice] = receiver_settings.compression_threads;
+         cuda_stream_ready[ib_slice] = chunk + NCUDA_STREAMS*CUDA_TO_IB_BUFFER;
          pthread_cond_broadcast(cuda_stream_ready_cond+ib_slice);
          pthread_mutex_unlock(cuda_stream_ready_mutex+ib_slice);
 
@@ -351,12 +369,11 @@ void *run_gpu_thread(void *in_threadarg) {
              std::cout << "GPU: execution error" << std::endl;
              pthread_exit(0);
          }
-
-
          // Analyze results to find spots
     }
-
     cudaEventDestroy (event_mem_copied);
+
+    std::cout << "GPU: Thread "<< arg->ThreadID << " done" << std::endl;
     pthread_exit(0);
 }
 

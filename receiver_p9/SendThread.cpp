@@ -192,7 +192,32 @@ void *run_poll_cq_thread(void *in_threadarg) {
 		pthread_cond_signal(&ib_buffer_occupancy_cond);
 		pthread_mutex_unlock(&ib_buffer_occupancy_mutex);
 	}
+        std::cout << "CQ Poll: Done" << std::endl;
 	pthread_exit(0);
+}
+
+void mark_chunk_done(size_t chunk) {
+     size_t ib_slice = chunk % (NCUDA_STREAMS*CUDA_TO_IB_BUFFER);
+     pthread_mutex_lock(writer_threads_done_mutex+ib_slice);
+
+     // Increment counter of writers done
+     writer_threads_done[ib_slice] ++;
+     // If all writers done - wake up GPU thread
+     if (writer_threads_done[ib_slice] == receiver_settings.compression_threads)
+          pthread_cond_signal(writer_threads_done_cond+ib_slice);
+
+     pthread_mutex_unlock(writer_threads_done_mutex+ib_slice);
+}
+
+void wait_for_write_to_chunk(size_t chunk) {
+     size_t ib_slice = chunk % (NCUDA_STREAMS*CUDA_TO_IB_BUFFER);
+
+     // Make sure that CUDA stream is ready to go
+     pthread_mutex_lock(cuda_stream_ready_mutex+ib_slice);
+     while (cuda_stream_ready[ib_slice] != chunk)
+         pthread_cond_wait(cuda_stream_ready_cond+ib_slice,
+                           cuda_stream_ready_mutex+ib_slice);
+     pthread_mutex_unlock(cuda_stream_ready_mutex+ib_slice);
 }
 
 void *run_send_thread(void *in_threadarg) {
@@ -200,34 +225,31 @@ void *run_send_thread(void *in_threadarg) {
 
     uint32_t current_frame_number = lastModuleFrameNumber();
 
-    int current_gpu_slice = 0;
+    // Account for leftover
+    size_t total_chunks = experiment_settings.nframes_to_write / NFRAMES_PER_STREAM;
+    if (experiment_settings.nframes_to_write - total_chunks * NFRAMES_PER_STREAM > 0)
+           total_chunks++;
+
+    size_t current_chunk = 0; // assume that receiver_settings.compression_threads << NFRAMES_PER_STREAM
+
     for (size_t frame = arg->ThreadID;
     		frame < experiment_settings.nframes_to_write;
     		frame += receiver_settings.compression_threads) {
         if (receiver_settings.use_gpu) {
             // Synchronization of GPU part with GPU threads
-            if (current_gpu_slice != frame / NFRAMES_PER_STREAM) {
-                int finished_cuda_stream = current_gpu_slice % (NCUDA_STREAMS*CUDA_TO_IB_BUFFER);
+            size_t new_chunk = frame / NFRAMES_PER_STREAM;
 
-                // Decrement counter of writers done
-                pthread_mutex_lock(writer_threads_done_mutex+finished_cuda_stream);
-                writer_threads_done[finished_cuda_stream] --;
-                if (writer_threads_done[finished_cuda_stream] == 0)
-                    pthread_cond_signal(writer_threads_done_cond+finished_cuda_stream);
-                pthread_mutex_unlock(writer_threads_done_mutex+finished_cuda_stream);
+            // If we operate in the same chunk as before, there is no need to synchronize
+            if (current_chunk != new_chunk) {
 
-                current_gpu_slice = frame / NFRAMES_PER_STREAM;
-                int new_cuda_stream = current_gpu_slice % (NCUDA_STREAMS*CUDA_TO_IB_BUFFER);
+                mark_chunk_done(current_chunk);
+                wait_for_write_to_chunk(new_chunk);
 
-                // Make sure that CUDA stream is ready to go
-                pthread_mutex_lock(cuda_stream_ready_mutex+new_cuda_stream);
-                while (cuda_stream_ready[new_cuda_stream] == 0)
-                    pthread_cond_wait(cuda_stream_ready_cond+new_cuda_stream,
-                                      cuda_stream_ready_mutex+new_cuda_stream);
-                cuda_stream_ready[new_cuda_stream]--;
-                pthread_mutex_unlock(cuda_stream_ready_mutex+new_cuda_stream);
+                // Update chunk
+                current_chunk = new_chunk;
             }
         }
+
     	// Find free buffer to write
     	int32_t buffer_id;
 
@@ -243,7 +265,7 @@ void *run_send_thread(void *in_threadarg) {
 
     	pthread_mutex_unlock(&ib_buffer_occupancy_mutex);
 
-        size_t collected_frame = frame*experiment_settings.summation + trigger_frame;
+        size_t collected_frame = frame*experiment_settings.summation;
 
         if (current_frame_number < (collected_frame+experiment_settings.summation-1) + 2) {
     	// Ensure that all frames were already collected, if not wait to try again
@@ -351,6 +373,13 @@ void *run_send_thread(void *in_threadarg) {
                 usleep(10);
     	}
     }
+
+    mark_chunk_done(current_chunk);
+
+    // Case when last chunk has handful of elements and is not covered by this thread
+    if (current_chunk != total_chunks - 1)
+        mark_chunk_done(total_chunks - 1);
+
     std::cout << arg->ThreadID << ": Sending done" << std::endl;
     pthread_exit(0);
 }

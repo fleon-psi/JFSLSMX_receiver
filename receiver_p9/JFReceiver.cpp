@@ -290,13 +290,6 @@ int main(int argc, char **argv) {
         // Allocate space on GPU
         if (setup_gpu(receiver_settings.gpu_device) == 1) exit(EXIT_FAILURE);
 
-        for (int i = 0; i < NCUDA_STREAMS*CUDA_TO_IB_BUFFER; i++) {
-            pthread_mutex_init(cuda_stream_ready_mutex+i, NULL);
-            pthread_cond_init(cuda_stream_ready_cond+i, NULL);
-            pthread_mutex_init(writer_threads_done_mutex+i, NULL);
-            pthread_cond_init(writer_threads_done_cond+i, NULL);
-        }
-
 	// Establish TCP/IP server
 	if (TCP_server(receiver_settings.tcp_port) == 1) exit(EXIT_FAILURE);
 
@@ -352,8 +345,8 @@ int main(int argc, char **argv) {
            // Reset counter for GPU synchronization
            if (receiver_settings.use_gpu) {
                for (int i = 0; i < NCUDA_STREAMS*CUDA_TO_IB_BUFFER; i++) {
-                   writer_threads_done[i] = receiver_settings.compression_threads;
-                   cuda_stream_ready[i]   = receiver_settings.compression_threads;
+                   writer_threads_done[i] = 0;
+                   cuda_stream_ready[i]   = i;
                }
                for (int i = 0; i < NCUDA_STREAMS; i++) {
                    gpu_thread_arg[i].ThreadID = i;
