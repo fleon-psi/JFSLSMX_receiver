@@ -51,9 +51,9 @@ void *writer_thread(void* thread_arg) {
 
         // Create buffer to store compression settings
         char *compression_buffer = NULL;
-        if (writer_settings.compression == COMPRESSION_BSHUF_LZ4)
+        if (writer_settings.compression == JF_COMPRESSION_BSHUF_LZ4)
             compression_buffer = (char *) malloc(bshuf_compress_lz4_bound(COMPOSED_IMAGE_SIZE, experiment_settings.pixel_depth, LZ4_BLOCK_SIZE) + 12);
-        if (writer_settings.compression == COMPRESSION_BSHUF_ZSTD)
+        if (writer_settings.compression == JF_COMPRESSION_BSHUF_ZSTD)
             compression_buffer = (char *) malloc(bshuf_compress_zstd_bound(COMPOSED_IMAGE_SIZE,experiment_settings.pixel_depth, ZSTD_BLOCK_SIZE) + 12);
 
         size_t number_of_rqs = RDMA_RQ_SIZE;
@@ -94,14 +94,14 @@ void *writer_thread(void* thread_arg) {
 				+ COMPOSED_IMAGE_SIZE * experiment_settings.pixel_depth * ib_wc.wr_id;
 
                 switch(writer_settings.compression) {
-                    case COMPRESSION_NONE:
+                    case JF_COMPRESSION_NONE:
                         if (writer_settings.write_hdf5 == true)
                             save_data_hdf(ib_buffer_location, frame_size, frame_id, card_id);
                         else 
 		            write_frame(ib_buffer_location, frame_size, frame_id, card_id);
                         break;
 
-                    case COMPRESSION_BSHUF_LZ4:
+                    case JF_COMPRESSION_BSHUF_LZ4:
 		        bshuf_write_uint64_BE(compression_buffer, COMPOSED_IMAGE_SIZE * experiment_settings.pixel_depth);
 		        bshuf_write_uint32_BE(compression_buffer + 8, LZ4_BLOCK_SIZE);
                         frame_size = bshuf_compress_lz4(ib_buffer_location, compression_buffer + 12, COMPOSED_IMAGE_SIZE, experiment_settings.pixel_depth, LZ4_BLOCK_SIZE) + 12;
@@ -111,7 +111,7 @@ void *writer_thread(void* thread_arg) {
 		            write_frame(compression_buffer, frame_size, frame_id, card_id);
                         break;
 
-                    case COMPRESSION_BSHUF_ZSTD:
+                    case JF_COMPRESSION_BSHUF_ZSTD:
 		        bshuf_write_uint64_BE(compression_buffer, COMPOSED_IMAGE_SIZE * experiment_settings.pixel_depth);
 		        bshuf_write_uint32_BE(compression_buffer + 8, ZSTD_BLOCK_SIZE);
                         frame_size = bshuf_compress_zstd(ib_buffer_location, compression_buffer + 12, COMPOSED_IMAGE_SIZE, experiment_settings.pixel_depth, ZSTD_BLOCK_SIZE) + 12;

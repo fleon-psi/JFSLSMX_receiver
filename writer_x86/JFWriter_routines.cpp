@@ -29,9 +29,9 @@
 int jfwriter_setup() {
         // Register HDF5 bitshuffle filter
         H5Zregister(bshuf_H5Filter);
-
+#ifndef OFFLINE
         det = new sls::Detector();
-
+#endif
 	for (int i = 0; i < NCARDS; i++) {
             // Setup IB and allocate memory
             setup_infiniband(i);
@@ -46,7 +46,9 @@ int jfwriter_close() {
             close_infiniband(i);
 	    pthread_mutex_destroy(&(remaining_frames_mutex[i]));
 	}
+#ifndef OFFLINE
         delete(det);
+#endif
         return 0;
 }
 
@@ -58,8 +60,9 @@ int jfwriter_arm() {
 
 	if (experiment_settings.conversion_mode == MODE_QUIT)
             return 0;
-        
+#ifndef OFFLINE
         if (setup_detector() == 1) return 1;
+#endif
         if (writer_settings.write_hdf5 == true)
             open_data_hdf5();
 
@@ -89,6 +92,8 @@ int jfwriter_arm() {
 #ifndef OFFLINE
         trigger_detector();
 #endif
+        if ((experiment_settings.pedestalG0_frames > 0) && (experiment_settings.conversion_mode == MODE_CONV))
+            time_pedestalG0 = time_datacollection;
         return 0;
 }
 
@@ -101,6 +106,11 @@ int jfwriter_disarm() {
 			int ret = pthread_join(writer[i], NULL);
 	}
 
+        // Data files can be closed, when all frames were written,
+        // even if collection is still running
+        if (writer_settings.write_hdf5 == true)
+            close_data_hdf5();
+
         // Involves barrier after collecting data
 	for (int i = 0; i < NCARDS; i++)
             disconnect_from_power9(i);
@@ -109,7 +119,108 @@ int jfwriter_disarm() {
 #endif
 	if (writer_settings.HDF5_prefix != "")
             save_master_hdf5();
-        if (writer_settings.write_hdf5 == true)
-            close_data_hdf5();
         return 0;
+}
+
+void mean_pedeG0(double out[NMODULES*NCARDS]) {
+    for (size_t i = 0; i < NMODULES * NCARDS; i++) {
+        double sum = 0;
+        double count = 0;
+        for (size_t j = 0; j < MODULE_COLS*MODULE_LINES; j++) {
+           if (gain_pedestal.pixel_mask[i * MODULE_COLS * MODULE_LINES + j] == 0) {
+               sum += gain_pedestal.pedeG0[i * MODULE_COLS * MODULE_LINES + j] / 4.0;
+               count += 1.0;
+           }
+        }
+        out[i] = sum / count;
+    }
+}
+
+void mean_pedeG1(double out[NMODULES*NCARDS]) {
+    for (size_t i = 0; i < NMODULES * NCARDS; i++) {
+        double sum = 0;
+        double count = 0;
+        for (size_t j = 0; j < MODULE_COLS*MODULE_LINES; j++) {
+           if (gain_pedestal.pixel_mask[i * MODULE_COLS * MODULE_LINES + j] == 0) {
+               sum += gain_pedestal.pedeG1[i * MODULE_COLS * MODULE_LINES + j] / 4.0;
+               count += 1.0;
+           }
+        }
+        out[i] = sum / count;
+    }
+}
+
+void mean_pedeG2(double out[NMODULES*NCARDS]) {
+    for (size_t i = 0; i < NMODULES * NCARDS; i++) {
+        double sum = 0;
+        double count = 0;
+        for (size_t j = 0; j < MODULE_COLS*MODULE_LINES; j++) {
+           if (gain_pedestal.pixel_mask[i * MODULE_COLS * MODULE_LINES + j] == 0) {
+               sum += gain_pedestal.pedeG2[i * MODULE_COLS * MODULE_LINES + j] / 4.0;
+               count += 1.0;
+           }
+        }
+        out[i] = sum / count;
+    }
+}
+
+void count_bad_pixel(size_t out[NMODULES*NCARDS]) {
+    for (size_t i = 0; i < NMODULES * NCARDS; i++) {
+        size_t count = 0;
+        for (size_t j = 0; j < MODULE_COLS*MODULE_LINES; j++) {
+           if (gain_pedestal.pixel_mask[i * MODULE_COLS * MODULE_LINES + j] != 0)
+              count ++;           
+        }
+        out[i] = count;
+    }
+}
+
+int jfwriter_pedestal_G0() {
+    experiment_settings_t tmp_settings = experiment_settings;
+    experiment_settings.nframes_to_collect = experiment_settings.pedestalG0_frames;
+    experiment_settings.nframes_to_write = 0;
+    experiment_settings.ntrigger = 0;
+    experiment_settings.conversion_mode = MODE_PEDEG0;
+    writer_settings.timing_trigger = false;
+
+    if (jfwriter_arm() == 1) return 1;
+    if (jfwriter_disarm() == 1) return 1;
+    time_pedestalG0 = time_datacollection;    
+
+    experiment_settings = tmp_settings;
+    return 0;
+}
+
+int jfwriter_pedestal_G1() {
+    experiment_settings_t tmp_settings = experiment_settings;
+    experiment_settings.nframes_to_collect = experiment_settings.pedestalG1_frames;
+    experiment_settings.nframes_to_write = 0;
+    experiment_settings.ntrigger = 0;
+    experiment_settings.conversion_mode = MODE_PEDEG1;
+    writer_settings.timing_trigger = false;
+
+    if (jfwriter_arm() == 1) return 1;
+    if (jfwriter_disarm() == 1) return 1;
+
+    time_pedestalG1 = time_datacollection;    
+    
+    experiment_settings = tmp_settings;
+    return 0;
+}
+
+int jfwriter_pedestal_G2() {
+    experiment_settings_t tmp_settings = experiment_settings;
+    experiment_settings.nframes_to_collect = experiment_settings.pedestalG2_frames;
+    experiment_settings.nframes_to_write = 0;
+    experiment_settings.ntrigger = 0;
+    experiment_settings.conversion_mode = MODE_PEDEG2;
+    writer_settings.timing_trigger = false;
+
+    if (jfwriter_arm() == 1) return 1;
+    if (jfwriter_disarm() == 1) return 1;
+
+    time_pedestalG2 = time_datacollection;
+    
+    experiment_settings = tmp_settings;
+    return 0;
 }

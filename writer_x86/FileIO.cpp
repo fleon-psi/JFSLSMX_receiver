@@ -3,6 +3,7 @@
 #include <fstream>
 
 #include <hdf5.h>
+//#include <filesystem>
 
 #include "../bitshuffle/bitshuffle.h"
 #include "../bitshuffle/bshuf_h5filter.h"
@@ -13,6 +14,8 @@
 #define PIXEL_SIZE_IN_UM        75.0
 #define PIXEL_SIZE_IN_MM       (PIXEL_SIZE_IN_UM/1000.0)
 #define DETECTOR_NAME          "JF4M"
+#define SOURCE_NAME            "SLS"
+#define INSTRUMENT_NAME        "X06DA"
 
 #define HDF5_ERROR(ret,func) if (ret) printf("%s(%d) %s: err = %d\n",__FILE__,__LINE__, #func, ret), exit(ret)
 
@@ -23,6 +26,14 @@ hid_t *data_hdf5_dcpl;
 hid_t *data_hdf5_dataspace;
 
 pthread_mutex_t hdf5_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void make_dirs(std::string path) {
+    int pos = path.rfind("/");
+    if (pos != std::string::npos) {
+        std::cout << "Making directory " <<path.substr(0,pos) << std::endl;
+//        std::filesystem::create_directories(path.substr(0,pos));
+    }
+}
 
 int createDataChunkLink(std::string filename, hid_t location, std::string name, std::string remote) {
     std::string pure_filename;
@@ -99,7 +110,7 @@ int saveUInt16_3D(hid_t location, std::string name, const uint16_t *val, int dim
 
     // Create the dataset.
     hid_t dataset_id = H5Dcreate2(location, name.c_str(), H5T_STD_U16LE, dataspace_id,
-                                  dcpl_id, H5P_DEFAULT, H5P_DEFAULT);
+                                  H5P_DEFAULT, dcpl_id, H5P_DEFAULT);
 
     // Write the dataset.
     status = H5Dwrite(dataset_id, H5T_NATIVE_USHORT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
@@ -297,6 +308,12 @@ int saveString(hid_t location, std::string name, std::string val, std::string un
     return 0;
 }
 
+int saveTimeUTC(hid_t location, std::string name, time_t time) {
+    char buf[255];
+    strftime(buf, sizeof(buf), "%FT%TZ", gmtime(&time));
+    return saveString(location, name, std::string(buf));
+}
+
 int saveDouble(hid_t location, std::string name, double val, std::string units = "") {
     double tmp = val;
     return saveDouble1D(location, name, &tmp, units, 1);
@@ -381,7 +398,7 @@ void write_metrology(hid_t master_file_id) {
 
 	saveDouble(grp, "AXIS_D0", 0.0, "degrees");
 
-	double d0_vector[3] = {0, 0, -1};
+	double d0_vector[3] = {0, 0, 1};
 
 	dataset = H5Dopen2(grp , "AXIS_D0", H5P_DEFAULT);
 	addStringAttribute(dataset, "depends_on", "AXIS_RAIL");
@@ -452,9 +469,12 @@ void write_metrology(hid_t master_file_id) {
 
 int save_master_hdf5() {
 	std::string filename = "";
-	if (writer_settings.main_location != "") filename =
+	if (writer_settings.main_location != "") { 
+             make_dirs(writer_settings.main_location + "/" + writer_settings.HDF5_prefix);
+             filename =
 			writer_settings.main_location + "/" +
 			writer_settings.HDF5_prefix + "_master.h5";
+        }
 	else filename = writer_settings.HDF5_prefix + "_master.h5";
 
 	// Create Master file
@@ -465,6 +485,8 @@ int save_master_hdf5() {
 	}
 	hid_t grp = createGroup(hdf5_file, "/entry", "NXentry");
         saveString(grp,"definition", "NXmx");
+        saveTimeUTC(grp, "start_time", time_datacollection);
+        saveTimeUTC(grp, "end_time_esimated", time_datacollection + (time_t) (experiment_settings.nframes_to_collect * experiment_settings.frame_time));
 	H5Gclose(grp);
 
 	grp = createGroup(hdf5_file, "/entry/data","NXdata");
@@ -479,7 +501,12 @@ int save_master_hdf5() {
         }
 	H5Gclose(grp);
 
+	grp = createGroup(hdf5_file, "/entry/source","NXsource");
+        saveString(grp, "name", SOURCE_NAME);        
+	H5Gclose(grp);
+
 	grp = createGroup(hdf5_file, "/entry/instrument","NXinstrument");
+        saveString(grp, "name", INSTRUMENT_NAME);        
 	H5Gclose(grp);
 
 	grp = createGroup(hdf5_file, "/entry/instrument/filter", "NXattenuator");
@@ -505,6 +532,11 @@ int save_master_hdf5() {
 
         grp = createGroup(hdf5_file, "/entry/instrument/beam","NXbeam");
 	saveDouble(grp, "incident_wavelength",12.4/experiment_settings.energy_in_keV,"angstrom");
+        saveDouble(grp, "total_flux", experiment_settings.total_flux,"Hz");
+        if (experiment_settings.beam_size_x > 0) {
+            double beam_size[2] = {experiment_settings.beam_size_x, experiment_settings.beam_size_y};
+            saveDouble1D(grp, "incident_beam_size", beam_size, "um", 2);
+        }
 	H5Gclose(grp);
 
         grp = createGroup(hdf5_file, "/entry/sample","NXsample");
@@ -550,9 +582,13 @@ int save_master_hdf5() {
 	saveInt(grp, "x_pixels_in_detector", XPIXEL);
 	saveInt(grp, "y_pixels_in_detector", YPIXEL);
 
-        if (writer_settings.compression == COMPRESSION_BSHUF_LZ4) saveString(grp,"compression","bslz4");
-        else if (writer_settings.compression == COMPRESSION_BSHUF_ZSTD) saveString(grp,"compression","bszstd");
-        else if (writer_settings.compression == COMPRESSION_NONE) saveString(grp,"compression","");
+        if (writer_settings.compression == JF_COMPRESSION_BSHUF_LZ4) saveString(grp,"compression","bslz4");
+        else if (writer_settings.compression == JF_COMPRESSION_BSHUF_ZSTD) saveString(grp,"compression","bszstd");
+        else if (writer_settings.compression == JF_COMPRESSION_NONE) saveString(grp,"compression","");
+
+        saveTimeUTC(grp, "pedestal_G0_time", time_pedestalG0);
+        saveTimeUTC(grp, "pedestal_G1_time", time_pedestalG1);
+        saveTimeUTC(grp, "pedestal_G2_time", time_pedestalG2);
 
         herr_t status = H5Lcreate_hard(det_grp, "pixel_mask", grp, "pixel_mask", H5P_DEFAULT, H5P_DEFAULT);
         H5Gclose(grp);
@@ -569,7 +605,6 @@ int save_master_hdf5() {
 	saveUInt16_3D(grp, "G1", gain_pedestal.pedeG1, 1024, 512, NMODULES * NCARDS, 0.25);
 	saveUInt16_3D(grp, "G2", gain_pedestal.pedeG2, 1024, 512, NMODULES * NCARDS, 0.25);
 	H5Gclose(grp);
-
 
         grp = createGroup(hdf5_file, "/entry/instrument/detector/geometry","NXgeometry");
 	H5Gclose(grp);
@@ -643,14 +678,14 @@ int open_data_hdf5() {
 
 	// Set appropriate compression filter
         switch (writer_settings.compression) {
-            case COMPRESSION_BSHUF_LZ4:
+            case JF_COMPRESSION_BSHUF_LZ4:
 	    {
 		unsigned int params[] = {LZ4_BLOCK_SIZE, BSHUF_H5_COMPRESS_LZ4};                
 		h5ret = H5Pset_filter(data_hdf5_dcpl[i], (H5Z_filter_t)BSHUF_H5FILTER, H5Z_FLAG_MANDATORY, (size_t)2, params);
 		HDF5_ERROR(h5ret,H5Pset_filter);
 		break;
 	    }
-	    case COMPRESSION_BSHUF_ZSTD:
+	    case JF_COMPRESSION_BSHUF_ZSTD:
 	    {
 		unsigned int params[] = {ZSTD_BLOCK_SIZE, BSHUF_H5_COMPRESS_ZSTD};
 		h5ret = H5Pset_filter(data_hdf5_dcpl[i], (H5Z_filter_t)BSHUF_H5FILTER, H5Z_FLAG_MANDATORY, (size_t)2, params);

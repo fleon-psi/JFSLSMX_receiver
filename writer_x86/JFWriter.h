@@ -17,6 +17,7 @@
 #ifndef JFWRITER_H_
 #define JFWRITER_H_
 
+#include <ctime>
 #include <hdf5.h>
 #include <Detector.h>
 
@@ -30,7 +31,7 @@
 #define LZ4_BLOCK_SIZE  0
 #define ZSTD_BLOCK_SIZE (8*514*1030)
 
-enum compression_t {COMPRESSION_NONE, COMPRESSION_BSHUF_LZ4, COMPRESSION_BSHUF_ZSTD};
+enum compression_t {JF_COMPRESSION_NONE, JF_COMPRESSION_BSHUF_LZ4, JF_COMPRESSION_BSHUF_ZSTD};
 
 // Settings only necessary for writer
 struct writer_settings_t {
@@ -96,6 +97,11 @@ extern pthread_mutex_t remaining_frames_mutex[NCARDS];
 
 extern sls::Detector *det;
 
+extern time_t time_pedestalG0;
+extern time_t time_pedestalG1;
+extern time_t time_pedestalG2;
+extern time_t time_datacollection;
+
 int open_data_hdf5();
 int close_data_hdf5();
 int save_data_hdf(char *data, size_t size, size_t frame, int chunk);
@@ -118,5 +124,10 @@ int close_infiniband(int card_id);
 int connect_to_power9(int card_id);
 int disconnect_from_power9(int card_id);
 int exchange_magic_number(int sockfd);
+
+void mean_pedeG0(double out[NMODULES*NCARDS]);
+void mean_pedeG1(double out[NMODULES*NCARDS]);
+void mean_pedeG2(double out[NMODULES*NCARDS]);
+void count_bad_pixel(size_t out[NMODULES*NCARDS]);
 
 #endif // JFWRITER_H_

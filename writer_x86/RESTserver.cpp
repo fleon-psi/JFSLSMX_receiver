@@ -53,10 +53,19 @@ void default_parameters() {
     experiment_settings.pedestalG1_frames = 1000;
     experiment_settings.pedestalG2_frames = 1000;
     experiment_settings.conversion_mode = MODE_CONV;
-
+    
+    writer_settings.write_hdf5 = true;
+    writer_settings.images_per_file = 1000;
     writer_settings.nthreads = NCARDS * 8; // Spawn 8 writer threads per card
     writer_settings.nlocations = 0;
     writer_settings.timing_trigger = true;
+
+    writer_settings.nlocations = 4;
+    writer_settings.data_location[0] = "/mnt/n0ram/";
+    writer_settings.data_location[1] = "/mnt/n1ram/";
+    writer_settings.data_location[2] = "/mnt/n2ram/";
+    writer_settings.data_location[3] = "/mnt/n3ram/";
+    writer_settings.main_location = "/mnt/n2ssd/";
 
     //These parameters are not changeable at the moment
     writer_connection_settings[0].ib_dev_name = "mlx5_1";
@@ -93,15 +102,20 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
             std::cout << "Shutter delay:        " << experiment_settings.shutter_delay << std::endl;
             std::cout << "Full speed:           " << experiment_settings.jf_full_speed << std::endl;
             std::cout << "Name pattern:         " << writer_settings.HDF5_prefix << std::endl;
+            std::cout << "Mode:                 " << writer_settings.write_hdf5 << std::endl;
             simplon_state = STATE_ACQUIRE;
+            jfwriter_arm();
+            std::cout << "Arm done" << std::endl;
             response.send(Pistache::Http::Code::Ok);
         } else {
             response.send(Pistache::Http::Code::Bad_Request);
         }
     } else if (command == "disarm") {
         if (simplon_state == STATE_ACQUIRE) {
-            std::cout << "Disarm" << std::endl;
-            // Disarm
+            jfwriter_disarm();
+            std::cout << "Disarm done" << std::endl;
+            // Disarm done
+            simplon_state = STATE_READY;
             response.send(Pistache::Http::Code::Ok);
         } else {
             response.send(Pistache::Http::Code::Bad_Request);
@@ -109,6 +123,9 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
     } else if (command == "cancel") {
         if (simplon_state == STATE_ACQUIRE) {
             std::cout << "Disarm" << std::endl;
+            jfwriter_disarm();
+            simplon_state = STATE_READY;
+
             // Disarm
             response.send(Pistache::Http::Code::Ok);
         } else {
@@ -116,6 +133,8 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
         }
     } else if (command == "abort") {
         if (simplon_state == STATE_ACQUIRE) {
+            jfwriter_disarm();
+            simplon_state = STATE_READY;
             std::cout << "Disarm" << std::endl;
             // Disarm
             response.send(Pistache::Http::Code::Ok);
@@ -158,14 +177,17 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
     else if (variable == "beam_center_y") experiment_settings.beam_y = json_input["value"].get<float>();
     else if (variable == "detector_distance") experiment_settings.detector_distance = json_input["value"].get<float>();
     else if (variable == "omega_increment") experiment_settings.omega_angle_per_image = json_input["value"].get<float>();
+    else if (variable == "total_flux") experiment_settings.total_flux = json_input["value"].get<float>();
+    else if (variable == "beam_size_x") experiment_settings.beam_size_x = json_input["value"].get<float>();
+    else if (variable == "beam_size_y") experiment_settings.beam_size_y = json_input["value"].get<float>();
 
     else if (variable == "beamline_delay") experiment_settings.beamline_delay = json_input["value"].get<float>();
     else if (variable == "shutter_delay") experiment_settings.shutter_delay = json_input["value"].get<float>();
 
     else if (variable == "compression") {
-        if (json_input["value"].get<std::string>() == "bslz4") writer_settings.compression = COMPRESSION_BSHUF_LZ4;
-        else if (json_input["value"].get<std::string>() == "bszstd") writer_settings.compression = COMPRESSION_BSHUF_ZSTD;
-        else writer_settings.compression = COMPRESSION_NONE;
+        if (json_input["value"].get<std::string>() == "bslz4") writer_settings.compression = JF_COMPRESSION_BSHUF_LZ4;
+        else if (json_input["value"].get<std::string>() == "bszstd") writer_settings.compression = JF_COMPRESSION_BSHUF_ZSTD;
+        else writer_settings.compression = JF_COMPRESSION_NONE;
     }
 
     else if (variable == "speed") {
@@ -203,6 +225,12 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
     else if (variable == "beam_center_x") {j["value"] = experiment_settings.beam_x; j["value_type"] = "float"; j["unit"] = "pixel";}
     else if (variable == "beam_center_y") {j["value"] = experiment_settings.beam_y; j["value_type"] = "float"; j["unit"] = "pixel";}
     else if (variable == "detector_distance") {j["value"] = experiment_settings.detector_distance; j["value_type"] = "float"; j["unit"] = "mm";}
+    else if (variable == "beam_size_x") {j["value"] = experiment_settings.beam_size_x; j["value_type"] = "float"; j["unit"] = "um";}
+    else if (variable == "beam_size_y") {j["value"] = experiment_settings.beam_size_y; j["value_type"] = "float"; j["unit"] = "um";}
+    else if (variable == "total_flux") {j["value"] = experiment_settings.total_flux; j["value_type"] = "float"; j["unit"] = "1/s";}
+    else if (variable == "transmission") {j["value"] = experiment_settings.transmission; j["value_type"] = "float";}
+
+
     else if (variable == "x_pixels_in_detector") {j["value"] = XPIXEL; j["value_type"] = "uint";}
     else if (variable == "y_pixels_in_detector") {j["value"] = YPIXEL; j["value_type"] = "uint";}
     else if (variable == "bit_depth_image") {j["value"] = experiment_settings.pixel_depth*8; j["value_type"] = "uint";}
@@ -226,6 +254,48 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
         if (experiment_settings.conversion_mode == MODE_RAW) j["value"] = "raw";
         if (experiment_settings.conversion_mode == MODE_PEDEG1) j["value"] = "pedestalG1";
         if (experiment_settings.conversion_mode == MODE_PEDEG2) j["value"] = "pedestalG2";
+    } else if (variable == "mean_pedestalG0") {
+        double out[NMODULES*NCARDS];        
+        mean_pedeG0(out);
+        double sum;
+        for (int i = 0; i < NMODULES * NCARDS; i++) {
+           sum += out[i];
+           j["mod"+std::to_string(i)] = out[i];
+        }
+        j["all"] = sum / (NMODULES * NCARDS);
+    } else if (variable == "mean_pedestalG1") {
+        double out[NMODULES*NCARDS];        
+        mean_pedeG0(out);
+        double sum;
+        for (int i = 0; i < NMODULES * NCARDS; i++) {
+           sum += out[i];
+           j["mod"+std::to_string(i)] = out[i];
+        }
+        j["all"] = sum / (NMODULES * NCARDS);
+    } else if (variable == "mean_pedestalG2") {
+        double out[NMODULES*NCARDS];        
+        mean_pedeG1(out);
+        double sum;
+        for (int i = 0; i < NMODULES * NCARDS; i++) {
+           sum += out[i];
+           j["mod"+std::to_string(i)] = out[i];
+        }
+        j["all"] = sum / (NMODULES * NCARDS);
+    } else if (variable == "bad_pixels") {
+        size_t out[NMODULES*NCARDS];        
+        count_bad_pixel(out);
+        size_t sum;
+        for (int i = 0; i < NMODULES * NCARDS; i++) {
+           sum += out[i];
+           j["mod"+std::to_string(i)] = out[i];
+        }
+        j["all"] = sum;
+    } else if (variable == "pedestalG0") {
+         response.send(Pistache::Http::Code::Ok, (char *) gain_pedestal.pedeG0, NCARDS * NPIXEL * sizeof(uint16_t), MIME(Application, OctetStream));    
+    } else if (variable == "pedestalG1") {
+         response.send(Pistache::Http::Code::Ok, (char *) gain_pedestal.pedeG1, NCARDS * NPIXEL * sizeof(uint16_t), MIME(Application, OctetStream));    
+    } else if (variable == "pedestalG2") {
+         response.send(Pistache::Http::Code::Ok, (char *) gain_pedestal.pedeG2, NCARDS * NPIXEL * sizeof(uint16_t), MIME(Application, OctetStream));
     }
     else {
 	 response.send(Pistache::Http::Code::Not_Found, "Key " + variable + " doesn't exists");
@@ -288,6 +358,7 @@ int main() {
 
     jfwriter_setup();
 
+    std::cout << "Server running"<< std::endl;
     Pistache::Address addr(Pistache::Ipv4::any(), Pistache::Port(5232));
 
     Pistache::Rest::Router router;
