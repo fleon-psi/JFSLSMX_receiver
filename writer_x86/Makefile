@@ -21,8 +21,8 @@ UNAME_P := $(shell uname -p)
 # Finding $SNAP_ROOT
 ifndef SNAP_ROOT
 # check if we are in sw folder of an action (three directories below snap root)
-ifneq ("$(wildcard ../../../../ActionTypes.md)","")
-SNAP_ROOT=$(abspath ../../../../)
+ifneq ("$(wildcard ../../../ActionTypes.md)","")
+SNAP_ROOT=$(abspath ../../../)
 else
 $(info You are not building your software from the default directory (/path/to/snap/actions/<action_name>/sw) or specified a wrong $$SNAP_ROOT.)
 $(error Please make sure that $$SNAP_ROOT is set up correctly.)
@@ -38,8 +38,8 @@ SLS_DETECTOR_LIB=-L${SLS_DETECTOR_PATH}/build/bin/ -lSlsDetector -lSlsSupport
 
 HDF5_PATH=/opt/hdf5-1.10.5
 HDF5_LIBS=$(HDF5_PATH)/lib/libhdf5.a
-PISTACHE_PATH=../pistache/prefix
-PISTACHE_LIB=$(PISTACHE_PATH)/lib64/libpistache.a
+PISTACHE_PATH=../pistache/
+PISTACHE_LIB=$(PISTACHE_PATH)/build/src/libpistache.a
 
 CXX=icpc
 CC=icc
@@ -48,12 +48,9 @@ CXXFLAGS= -std=c++14 -Ofast -g -static-intel -xHost -ip -Wall -DUSE_ZSTD -debug 
 LDFLAGS= -Ofast -g -static-intel -xHost -ip -llz4 -lm -lpthread -lz -libverbs -debug inline-debug-info -lssh
 CPPFLAGS= -I. -I../include -I${HDF5_PATH}/include -I$(PISTACHE_PATH)/include $(SLS_DETECTOR_INCLUDE) $(SNAP_INCLUDE)
 
-WR_SRCS=JFWriter_routines.o NetIO.o FileIO.o WriterThread.o DetConfig.o sharedVariables.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o
+WR_SRCS=JFWriter.o NetIO.o FileIO.o WriterThread.o DetConfig.o sharedVariables.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o
 
-all: JFWriter RESTserver
-
-JFWriter: $(WR_SRCS) JFWriter.o
-	$(CXX) $(WR_SRCS) JFWriter.o -o JFWriter $(JF_LDLIBS) $(HDF5_LIBS) $(LDFLAGS) $(SLS_DETECTOR_LIB) -lzstd
+all: RESTserver
 
 RESTserver: $(WR_SRCS) RESTserver.o
 	$(CXX) $(WR_SRCS) RESTserver.o -o RESTserver $(JF_LDLIBS) $(HDF5_LIBS) $(LDFLAGS) $(SLS_DETECTOR_LIB) $(PISTACHE_LIB) -lzstd
