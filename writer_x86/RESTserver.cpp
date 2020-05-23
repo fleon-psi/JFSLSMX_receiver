@@ -8,10 +8,12 @@
 
 #include "JFWriter.h"
 
+#define PEDESTAL_TIME_CUTOFF (60*60) // collect pedestal every 1 hour
 #define API_VERSION "jf-0.1.0"
 #define KEV_OVER_ANGSTROM 12.398
 
-enum simplon_state_t {STATE_READY, STATE_ACQUIRE, STATE_ERROR} simplon_state;
+enum simplon_state_t {STATE_READY, STATE_ACQUIRE, STATE_ERROR, STATE_INITIALIZE, STATE_NA} simplon_state;
+
 void update_summation() {
     if (experiment_settings.jf_full_speed) {
         experiment_settings.frame_time_detector = 0.0005;
@@ -41,7 +43,6 @@ void update_summation() {
 }
 
 void default_parameters() {
-    simplon_state = STATE_READY;
     experiment_settings.jf_full_speed = false;
     experiment_settings.summation = 1;
     experiment_settings.pixel_depth = 2;
@@ -104,6 +105,20 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
             std::cout << "Name pattern:         " << writer_settings.HDF5_prefix << std::endl;
             std::cout << "Mode:                 " << writer_settings.write_hdf5 << std::endl;
             simplon_state = STATE_ACQUIRE;
+
+            // If pedestal is old (or settings changed), need to update it
+            time_t now;
+            time(&now);
+            if (((long)(time - time_pedestalG0) > PEDESTAL_TIME_CUTOFF) 
+                && (experiment_settings.pedestalG0_frames == 0)) 
+                jfwriter_pedestalG0();
+            if (((long)(time - time_pedestalG1) > PEDESTAL_TIME_CUTOFF) 
+                || ((long)(time - time_pedestalG2) > PEDESTAL_TIME_CUTOFF)) {
+                jfwriter_pedestalG1(); 
+                jfwriter_pedestalG2();
+            }
+
+            // Arm
             jfwriter_arm();
             std::cout << "Arm done" << std::endl;
             response.send(Pistache::Http::Code::Ok);
@@ -148,11 +163,20 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
     } else if (command == "initialize") {
         std::cout << "Initialize" << std::endl;
         if (simplon_state == STATE_ACQUIRE) {
-            std::cout << "Disarm" << std::endl;
             // Disarm
+            jfwriter_disarm();
+            std::cout << "Disarm done" << std::endl;
         }
-        default_parameters();
+        simplon_state = STATE_INITIALIZE;
+
         // Init
+        default_parameters();
+        jfwriter_pedestalG0();        
+        jfwriter_pedestalG1();        
+        jfwriter_pedestalG2();        
+
+        simplon_state = STATE_READY;
+
         response.send(Pistache::Http::Code::Ok);
     } else
         response.send(Pistache::Http::Code::Not_Found);
@@ -193,6 +217,9 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
     else if (variable == "speed") {
         if (json_input["value"].get<std::string>() == "full") experiment_settings.jf_full_speed = true; 
         if (json_input["value"].get<std::string>() == "half") experiment_settings.jf_full_speed = false;
+        time_pedestalG0 = 0;
+        time_pedestalG1 = 0;
+        time_pedestalG2 = 0;
     }
 
     else if (variable == "mode") {
@@ -203,9 +230,9 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
     }
 
     else if (variable == "frame_time") experiment_settings.frame_time = json_input["value"].get<float>();
-    else if (variable == "pedestalG0_frames") experiment_settings.pedestalG0_frames = json_input["value"].get<int>();
-    else if (variable == "pedestalG1_frames") experiment_settings.pedestalG1_frames = json_input["value"].get<int>();
-    else if (variable == "pedestalG2_frames") experiment_settings.pedestalG2_frames = json_input["value"].get<int>();
+    else if (variable == "pedestalG0_frames") {experiment_settings.pedestalG0_frames = json_input["value"].get<int>(); time_pedestalG0 = 0;}
+    else if (variable == "pedestalG1_frames") {experiment_settings.pedestalG1_frames = json_input["value"].get<int>(); time_pedestalG1 = 0;}
+    else if (variable == "pedestalG2_frames") {experiment_settings.pedestalG2_frames = json_input["value"].get<int>(); time_pedestalG2 = 0;}
     else {
 	 response.send(Pistache::Http::Code::Not_Found, "Key " + variable + " doesn't exists");
          return;
@@ -215,6 +242,11 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
 }
 
 void detector_get(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    if (simplon_state == STATE_NA) {
+        response.send(Pistache::Http::Code::Bad_Request);
+        return;
+    }
+
     auto variable = request.param(":variable").as<std::string>();
     nlohmann::json j;
 
@@ -328,6 +360,11 @@ void filewriter_set(const Pistache::Rest::Request& request, Pistache::Http::Resp
 }
 
 void filewriter_get(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    if (simplon_state == STATE_NA) {
+        response.send(Pistache::Http::Code::Bad_Request);
+        return;
+    }
+
     auto variable = request.param(":variable").as<std::string>();
     nlohmann::json j;
     response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));
@@ -349,15 +386,18 @@ void detector_state(const Pistache::Rest::Request& request, Pistache::Http::Resp
         case STATE_ERROR:
             j = {"error"};
             break;
+        case STATE_NA:
+            j = {"na"};
+            break;
     }
     response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));            
 }
 
 int main() {
-    default_parameters();
+    simplon_state = STATE_NA;
 
     jfwriter_setup();
-
+    
     std::cout << "Server running"<< std::endl;
     Pistache::Address addr(Pistache::Ipv4::any(), Pistache::Port(5232));
 

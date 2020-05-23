@@ -7,7 +7,7 @@
 #include <lz4.h>
 #include <infiniband/verbs.h>
 
-#include "../include/action_rx100G.h"
+#include "include/action_rx100G.h"
 
 #define COMPOSED_IMAGE_SIZE (514L*1030L*NMODULES)
 //#define RDMA_BUFFER_MAX_ELEM_SIZE (COMPOSED_IMAGE_SIZE*si)

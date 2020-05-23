@@ -175,7 +175,7 @@ void count_bad_pixel(size_t out[NMODULES*NCARDS]) {
     }
 }
 
-int jfwriter_pedestal_G0() {
+int jfwriter_pedestalG0() {
     experiment_settings_t tmp_settings = experiment_settings;
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG0_frames;
     experiment_settings.nframes_to_write = 0;
@@ -191,7 +191,7 @@ int jfwriter_pedestal_G0() {
     return 0;
 }
 
-int jfwriter_pedestal_G1() {
+int jfwriter_pedestalG1() {
     experiment_settings_t tmp_settings = experiment_settings;
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG1_frames;
     experiment_settings.nframes_to_write = 0;
@@ -208,7 +208,7 @@ int jfwriter_pedestal_G1() {
     return 0;
 }
 
-int jfwriter_pedestal_G2() {
+int jfwriter_pedestalG2() {
     experiment_settings_t tmp_settings = experiment_settings;
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG2_frames;
     experiment_settings.nframes_to_write = 0;

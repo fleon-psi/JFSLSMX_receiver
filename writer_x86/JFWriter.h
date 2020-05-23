@@ -112,6 +112,9 @@ int jfwriter_arm();
 int jfwriter_disarm();
 int jfwriter_setup();
 int jfwriter_close();
+int jfwriter_pedestalG0();
+int jfwriter_pedestalG1();
+int jfwriter_pedestalG2();
 
 int write_frame(char *data, size_t size, int frame_id, int thread_id);
 

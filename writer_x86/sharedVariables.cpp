@@ -38,7 +38,7 @@ pthread_mutex_t remaining_frames_mutex[NCARDS];
 
 sls::Detector *det;
 
-time_t time_pedestalG0;
-time_t time_pedestalG1;
-time_t time_pedestalG2;
-time_t time_datacollection;
+time_t time_pedestalG0 = 0;
+time_t time_pedestalG1 = 0;
+time_t time_pedestalG2 = 0;
+time_t time_datacollection = 0;
