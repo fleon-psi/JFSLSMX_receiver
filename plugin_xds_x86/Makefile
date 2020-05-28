@@ -37,12 +37,12 @@ HDF5_LIBS=-L$(HDF5_PATH)/lib -lhdf5
 
 CXX=icpc
 CC=icc
-CFLAGS=-g -std=c99 -static-intel -Ofast -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info -DOFFLINE -fPIC
-CXXFLAGS= -std=c++14 -static-intel -Ofast -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info -DOFFLINE -fPIC -DOFFLINE
-LDFLAGS= -Ofast -static-intel -xHost -ip -llz4 -lm -lpthread -lz -libverbs -debug inline-debug-info -lssh
+CFLAGS=-g -std=c99 -static-intel -Ofast -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info -DOFFLINE -fPIC -DWITH_IPP
+CXXFLAGS= -std=c++14 -static-intel -Ofast -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info -DOFFLINE -fPIC -DOFFLINE -DWITH_IPP
+LDFLAGS= -static-intel -Ofast -xHost -ip -debug inline-debug-info -Wl,--as-needed -lippdc -lipps -lippcore
 CPPFLAGS= -I. -I../include -I${HDF5_PATH}/include
 
-PLUGIN_SRCS=plugin.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o
+PLUGIN_SRCS=plugin.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o ../lz4/lz4.o
 
 all: psi-jungfrau-plugin.so
 
@@ -50,6 +50,6 @@ psi-jungfrau-plugin.so: $(PLUGIN_SRCS)
 	$(CXX) $(PLUGIN_SRCS) -o psi-jungfrau-plugin.so -shared $(HDF5_LIBS) $(LDFLAGS) -lzstd
 
 clean:
-	rm -f *.o ../*.o ../bitshuffle/*.o psi-jungfrau-plugin.so
+	rm -f *.o ../*.o ../bitshuffle/*.o ../lz4/lz4.o psi-jungfrau-plugin.so
  
 

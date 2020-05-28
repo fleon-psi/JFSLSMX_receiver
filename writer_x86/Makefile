@@ -29,9 +29,6 @@ $(error Please make sure that $$SNAP_ROOT is set up correctly.)
 endif
 endif
 
-SNAP_LIBS=${SNAP_ROOT}/software/lib/libsnap.a -lcxl 
-SNAP_INCLUDE=-I${SNAP_ROOT}/software/include
-
 SLS_DETECTOR_PATH=/home/jungfrau/git/slsDetectorPackage
 SLS_DETECTOR_INCLUDE=-I${SLS_DETECTOR_PATH}/slsDetectorSoftware/include -I${SLS_DETECTOR_PATH}/slsSupportLib/include
 SLS_DETECTOR_LIB=-L${SLS_DETECTOR_PATH}/build/bin/ -lSlsDetector -lSlsSupport
@@ -43,12 +40,12 @@ PISTACHE_LIB=$(PISTACHE_PATH)/build/src/libpistache.a
 
 CXX=icpc
 CC=icc
-CFLAGS=-g -std=c99 -Ofast -g -static-intel -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info
-CXXFLAGS= -std=c++14 -Ofast -g -static-intel -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info
-LDFLAGS= -Ofast -g -static-intel -xHost -ip -llz4 -lm -lpthread -lz -libverbs -debug inline-debug-info -lssh
-CPPFLAGS= -I. -I../include -I${HDF5_PATH}/include -I$(PISTACHE_PATH)/include $(SLS_DETECTOR_INCLUDE) $(SNAP_INCLUDE)
+CFLAGS=-g -std=c99 -Ofast -g -static-intel -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info -DOFFLINE -fPIC
+CXXFLAGS= -std=c++14 -Ofast -g -static-intel -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info -DOFFLINE
+LDFLAGS= -Ofast -g -static-intel -xHost -ip -lm -lpthread -lz -libverbs -debug inline-debug-info -lssh $(IPPROOT)/lib/intel64/libippdc.a $(IPPROOT)/lib/intel64/libipps.a $(IPPROOT)/lib/intel64/libippcore.a
+CPPFLAGS= -I. -I../include -I${HDF5_PATH}/include -I$(PISTACHE_PATH)/include $(SLS_DETECTOR_INCLUDE)
 
-WR_SRCS=JFWriter.o NetIO.o FileIO.o WriterThread.o DetConfig.o sharedVariables.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o
+WR_SRCS=JFWriter.o NetIO.o FileIO.o WriterThread.o DetConfig.o sharedVariables.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o ../lz4/lz4.c
 
 all: RESTserver
 
