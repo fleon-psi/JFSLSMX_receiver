@@ -431,8 +431,8 @@ void write_metrology(hid_t master_file_id) {
 	for (int i = 0; i < NMODULES*NCARDS; i++) {
 		std::string moduleGroup = "/entry/instrument/detector/ARRAY_D0M" + std::to_string(i);
 		grp = createGroup(master_file_id, moduleGroup.c_str() ,"NXdetector_module");
-		int origin[2] = {(i % 2) * 514, (i / 2 ) *1030};
-		int size[2] = {514,1030};
+		int origin[2] = {(i % 2) * 1030, (i / 2 ) *514};
+		int size[2] = {1030,514};
 		saveInt1D(grp, "data_origin", origin, "", 2);
 		saveInt1D(grp, "data_size", size, "", 2);
 
@@ -680,15 +680,17 @@ int open_data_hdf5() {
         switch (writer_settings.compression) {
             case JF_COMPRESSION_BSHUF_LZ4:
 	    {
-		unsigned int params[] = {LZ4_BLOCK_SIZE, BSHUF_H5_COMPRESS_LZ4};                
-		h5ret = H5Pset_filter(data_hdf5_dcpl[i], (H5Z_filter_t)BSHUF_H5FILTER, H5Z_FLAG_MANDATORY, (size_t)2, params);
+		unsigned int params[] = {LZ4_BLOCK_SIZE, BSHUF_H5_COMPRESS_LZ4};
+                std::cout << "H5 " << params[1] << std::endl;
+		h5ret = H5Pset_filter(data_hdf5_dcpl[i], (H5Z_filter_t)BSHUF_H5FILTER, H5Z_FLAG_MANDATORY, experiment_settings.pixel_depth, params);
 		HDF5_ERROR(h5ret,H5Pset_filter);
 		break;
 	    }
 	    case JF_COMPRESSION_BSHUF_ZSTD:
 	    {
+                std::cout << "ZSTD" << std::endl;
 		unsigned int params[] = {ZSTD_BLOCK_SIZE, BSHUF_H5_COMPRESS_ZSTD};
-		h5ret = H5Pset_filter(data_hdf5_dcpl[i], (H5Z_filter_t)BSHUF_H5FILTER, H5Z_FLAG_MANDATORY, (size_t)2, params);
+		h5ret = H5Pset_filter(data_hdf5_dcpl[i], (H5Z_filter_t)BSHUF_H5FILTER, H5Z_FLAG_MANDATORY, experiment_settings.pixel_depth, params);
 		HDF5_ERROR(h5ret,H5Pset_filter);
 		break;
 	    }

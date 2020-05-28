@@ -91,6 +91,7 @@ int trigger_omega() {
 
 
 int setup_detector() {
+#ifndef OFFLINE
         det->stopDetector();
 
         det->setStartingFrameNumber(1);
@@ -131,11 +132,12 @@ int setup_detector() {
             det->setTimingMode(slsDetectorDefs::timingMode::TRIGGER_EXPOSURE);
         else
             det->setTimingMode(slsDetectorDefs::timingMode::AUTO_TIMING);
-        
+#endif        
         return 0;
 }
 
 int trigger_detector() {
+#ifndef OFFLINE
         time(&time_datacollection);
         if (writer_settings.timing_trigger) {
             det->startDetector();
@@ -147,11 +149,14 @@ int trigger_detector() {
             usleep(200000);
             det->startDetector();
         } 
+#endif
         return 0;
 }
 
 int close_detector() {
+#ifndef OFFLINE
         det->stopDetector();
         det->setSettings(slsDetectorDefs::detectorSettings::DYNAMICGAIN);
+#endif
         return 0;
 }

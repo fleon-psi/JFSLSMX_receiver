@@ -36,7 +36,9 @@ pthread_mutex_t total_compressed_size_mutex = PTHREAD_MUTEX_INITIALIZER;
 uint64_t remaining_frames[NCARDS];
 pthread_mutex_t remaining_frames_mutex[NCARDS];
 
+#ifndef OFFLINE
 sls::Detector *det;
+#endif
 
 time_t time_pedestalG0 = 0;
 time_t time_pedestalG1 = 0;

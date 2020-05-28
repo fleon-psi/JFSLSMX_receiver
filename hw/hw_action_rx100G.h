@@ -22,6 +22,13 @@
 #include <ap_int.h>
 #include <hls_stream.h>
 
+#ifdef OCACCEL
+#include <osnap_types.h>
+#else
+#include <snap_types.h>
+#endif
+
+
 #include "hls_snap.H"
 #include "../include/action_rx100G.h" /* HelloWorld Job definition */
 

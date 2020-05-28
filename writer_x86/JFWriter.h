@@ -19,7 +19,10 @@
 
 #include <ctime>
 #include <hdf5.h>
+
+#ifndef OFFLINE
 #include <Detector.h>
+#endif
 
 #include "../JFApp.h"
 #define RDMA_RQ_SIZE 4096L // Maximum number of receive elements
@@ -95,7 +98,9 @@ extern pthread_mutex_t total_compressed_size_mutex;
 extern uint64_t remaining_frames[NCARDS];
 extern pthread_mutex_t remaining_frames_mutex[NCARDS];
 
+#ifndef OFFLINE
 extern sls::Detector *det;
+#endif
 
 extern time_t time_pedestalG0;
 extern time_t time_pedestalG1;

@@ -297,7 +297,7 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
         j["all"] = sum / (NMODULES * NCARDS);
     } else if (variable == "mean_pedestalG1") {
         double out[NMODULES*NCARDS];        
-        mean_pedeG0(out);
+        mean_pedeG1(out);
         double sum;
         for (int i = 0; i < NMODULES * NCARDS; i++) {
            sum += out[i];
@@ -306,7 +306,7 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
         j["all"] = sum / (NMODULES * NCARDS);
     } else if (variable == "mean_pedestalG2") {
         double out[NMODULES*NCARDS];        
-        mean_pedeG1(out);
+        mean_pedeG2(out);
         double sum;
         for (int i = 0; i < NMODULES * NCARDS; i++) {
            sum += out[i];
@@ -395,6 +395,8 @@ void detector_state(const Pistache::Rest::Request& request, Pistache::Http::Resp
 
 int main() {
     simplon_state = STATE_NA;
+
+    default_parameters();
 
     jfwriter_setup();
     

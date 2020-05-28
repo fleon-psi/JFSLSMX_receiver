@@ -20,12 +20,6 @@
 
 #define OCACCEL
 
-#ifdef OCACCEL
-#include <osnap_types.h>
-#else
-#include <snap_types.h>
-#endif
-
 #define FRAME_BUF_SIZE        16384L
 #define FRAME_STATUS_BUF_SIZE 16384
 

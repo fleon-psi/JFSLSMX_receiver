@@ -24,10 +24,12 @@
 #include <osnap_tools.h>
 #include <libosnap.h>
 #include <osnap_hls_if.h>
+#include <osnap_types.h>
 #else
 #include <snap_tools.h>
 #include <libsnap.h>
 #include <snap_hls_if.h>
+#include <snap_types.h>
 #endif
 
 struct snap_card *card = NULL;

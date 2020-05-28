@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <iostream>
 
 #include "JFWriter.h"
 
