@@ -85,8 +85,8 @@ struct data_packet_t {
 	ap_uint<8> eth_packet; // 0..128
 	ap_uint<8> axis_packet; // 0..128
 	ap_uint<1> axis_user; // TUSER from AXIS
-        ap_uint<1> pedestal; // Contributes to pedestal G0? (only for MODE = MODE_CONV)
-        ap_uint<1> save;     // Contributes to pedestal G0? (only for MODE = MODE_CONV)
+    ap_uint<1> pedestal; // Contributes to pedestal G0? (only for MODE = MODE_CONV)
+    ap_uint<1> save;     // Contributes to pedestal G0? (only for MODE = MODE_CONV)
 	ap_uint<1> exit; // exit
 	ap_uint<1> trigger; // debug flag on
 };

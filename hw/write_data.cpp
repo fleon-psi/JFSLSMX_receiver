@@ -119,14 +119,9 @@ void write_data(DATA_STREAM &in, rx100g_mem_t *dout_gmem, size_t out_frame_buffe
 	statistics(31,0) = counter_ok;
 	statistics(63,32) = counter_wrong;
 
-	// statistics(64 + 32 * NMODULES + 31, 64 + 32 * NMODULES) = packet_in.frame_number;
-
 	// For all packets, set head as MAX number
 	for (int i = 0; i < NMODULES; i++)
 		statistics(64 + i * 32 + 31, 64 + i * 32) = INT32_MAX;
-
-	// Save last hbm cache
-	// statistics(511,256) = hbm_cache[0];
 
 	memcpy(dout_gmem+out_frame_status_addr, &statistics, BPERDW);
 }

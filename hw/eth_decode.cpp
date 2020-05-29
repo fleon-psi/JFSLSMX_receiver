@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
+#include <iostream>
 #include "hw_action_rx100G.h"
 
 enum rcv_state_t {RCV_INIT, RCV_JF_HEADER, RCV_GOOD, RCV_IGNORE};
@@ -147,10 +147,10 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 	packet_out.exit = 0;
 
 
-        uint8_t encountered_triggers = 0;
-        ap_uint<24> frame_number_last_trigger = 0;
-        ap_uint<24> frame_number_last_no_trigger  = 0;
-        ap_uint<1> trigger_set = 0; // This is only for beginning, to filter situation, where no filter was used
+	uint8_t encountered_triggers = 0;
+	ap_uint<24> frame_number_last_trigger = 0;
+	ap_uint<24> frame_number_last_no_trigger  = 0;
+	ap_uint<1> trigger_set = 0; // This is only for beginning, to filter situation, where no filter was used
 
 	while (packet_out.exit == 0) {
 #pragma HLS PIPELINE
@@ -171,13 +171,13 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 				if (header.jf_frame_number >= eth_settings.first_frame_number)
 					header.jf_frame_number -= eth_settings.first_frame_number;
 
-					// Quit if frame number reported is >= frame_number_to_quit
-					if (header.jf_frame_number >= eth_settings.frame_number_to_quit) packet_out.exit = 1;
-					else if (header.jf_frame_number < eth_settings.frame_number_to_stop) {
-						axis_packet = 0;
-						rcv_state = RCV_JF_HEADER;
-					}
+				// Quit if frame number reported is >= frame_number_to_quit
+				if (header.jf_frame_number >= eth_settings.frame_number_to_quit) packet_out.exit = 1;
+				else if (header.jf_frame_number < eth_settings.frame_number_to_stop) {
+					axis_packet = 0;
+					rcv_state = RCV_JF_HEADER;
 				}
+			}
 			break;
 		case RCV_JF_HEADER:
 			decode_eth_2(packet_in.data, header);
@@ -190,60 +190,71 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 			packet_out.module = header.udp_dest_port % NMODULES;
 			packet_out.trigger = header.jf_debug[31];
 
-                        if (header.jf_frame_number < eth_settings.pedestalG0_frames) {
-                            packet_out.pedestal = 1;
-                            packet_out.save = 0;
-                        } else {
-                            packet_out.frame_number -= eth_settings.pedestalG0_frames;
+			if (header.jf_frame_number < eth_settings.pedestalG0_frames) {
+				packet_out.pedestal = 1;
+				packet_out.save = 0;
+			} else {
+				packet_out.frame_number -= eth_settings.pedestalG0_frames;
 
-                            if (eth_settings.expected_triggers == 0) {
-                                packet_out.pedestal = 0;
-                                packet_out.save = 1;
-                            } else {
-                                packet_out.pedestal = 0;
-                                packet_out.save = 0;
-                                ap_int<25> delta = packet_out.frame_number - (frame_number_last_trigger + eth_settings.delay_per_trigger);
-                                if ((encountered_triggers == eth_settings.expected_triggers) &&
-                                           (delta > eth_settings.frames_per_trigger + DELAY_FRAMES_STOP_AND_QUIT)) {
-                                    // All expected triggers were observed + delay, so data collection can finish
-                                    packet_out.exit = 1;
-                                } else if ((packet_out.trigger == 1)
-                                    && (frame_number_last_no_trigger > frame_number_last_trigger + 2 * eth_settings.delay_per_trigger + eth_settings.frames_per_trigger)
-                                    && (delta > eth_settings.frames_per_trigger) 
-                                    && (encountered_triggers < eth_settings.expected_triggers)) {
-                                    // Frame is set as start of new sequence, if:
-                                    // 1. Trigger was observed in this frame AND
-                                    // 2. Frame without trigger was observed after previous sequence ended and shutter closing time was accounted AND
-                                    // 3. This frame is after previous sequence ended AND
-                                    // 4. There was not enough triggers observed till now
-                                    trigger_set = 1;
-                                    frame_number_last_trigger = packet_out.frame_number;
-                                    encountered_triggers ++;
-                                    if (eth_settings.delay_per_trigger == 0) {
-                                        packet_out.frame_number = (encountered_triggers - 1 ) * eth_settings.frames_per_trigger;
-                                        packet_out.save = 1;
-                                    }
-                                } else if ((trigger_set == 1) && (delta >= 0) && (delta < eth_settings.frames_per_trigger)) {
-                                    // Trigger is set and frame number is in a proper window
-                                    packet_out.frame_number = (encountered_triggers - 1 ) * eth_settings.frames_per_trigger + delta;
-                                    packet_out.save = 1;                                
-                                } else if ((packet_out.trigger == 0) && (packet_out.frame_number > frame_number_last_no_trigger)
-                                           && (delta >= eth_settings.frames_per_trigger) ) {
-                                    // Trigger is not set AND this frame is after last frame with no trigger
-                                    // AND after current sequence
-                                    frame_number_last_no_trigger = packet_out.frame_number;
-                                } else if ((packet_out.trigger == 0) && (trigger_set == 0)) {
-                                    // Trigger was not yet observed and this frame is without trigger, so it can be used to calculate G0
-                                    packet_out.pedestal = 1;
-                                }                                
-                            } 
-                        }                       
+				if (eth_settings.expected_triggers == 0) {
+					packet_out.pedestal = 0;
+					packet_out.save = 1;
+				} else {
+					packet_out.pedestal = 0;
+					packet_out.save = 0;
+					ap_int<25> delta = packet_out.frame_number - (frame_number_last_trigger + eth_settings.delay_per_trigger);
+					if ((encountered_triggers == eth_settings.expected_triggers) &&
+							(delta > eth_settings.frames_per_trigger + DELAY_FRAMES_STOP_AND_QUIT)) {
+						// All expected triggers were observed + delay, so data collection can finish
+						packet_out.exit = 1;
+						std::cout << "exit" << std::endl;
+					} else if (packet_out.trigger && !trigger_set) {
+						// This is the first trigger that is encountered
+						trigger_set = 1;
+						frame_number_last_trigger = packet_out.frame_number;
+						encountered_triggers = 1;
+						if (eth_settings.delay_per_trigger == 0) {
+							packet_out.frame_number = 0;
+							packet_out.save = 1;
+						}
+					} else if ((packet_out.trigger == 1)
+							&& (frame_number_last_no_trigger > frame_number_last_trigger + 2 * eth_settings.delay_per_trigger + eth_settings.frames_per_trigger)
+							&& (delta > eth_settings.frames_per_trigger)
+							&& (encountered_triggers < eth_settings.expected_triggers)) {
+						// Frame is set as start of new sequence, if:
+						// 1. Trigger was observed in this frame AND
+						// 2. Frame without trigger was observed after previous sequence ended and shutter closing time was accounted AND
+						// 3. This frame is after previous sequence ended AND
+						// 4. There was not enough triggers observed till now
+						trigger_set = 1;
+						frame_number_last_trigger = packet_out.frame_number;
+						encountered_triggers ++;
+						if (eth_settings.delay_per_trigger == 0) {
+							packet_out.frame_number = (encountered_triggers - 1 ) * eth_settings.frames_per_trigger;
+							packet_out.save = 1;
+						}
+					} else if (trigger_set && (delta >= 0) && (delta < eth_settings.frames_per_trigger)) {
+						// Trigger is set and frame number is in a proper window
+						packet_out.frame_number = (encountered_triggers - 1 ) * eth_settings.frames_per_trigger + delta;
+						packet_out.save = 1;
+					} else if (!packet_out.trigger && (packet_out.frame_number > frame_number_last_no_trigger)
+							&& (delta >= eth_settings.frames_per_trigger + eth_settings.delay_per_trigger) ) {
+						// Trigger is not set AND this frame is after last frame with no trigger
+						// AND after current sequence
+						frame_number_last_no_trigger = packet_out.frame_number;
+					} else if (!packet_out.trigger && !trigger_set) {
+						// Trigger was not yet observed and this frame is without trigger, so it can be used to calculate G0
+						packet_out.pedestal = 1;
+					}
+					std::cout << "Pedestal " << packet_out.pedestal << " Save " << packet_out.save << " Frame number " << packet_out.frame_number << " Delta " << delta << " Last no trigger " << frame_number_last_no_trigger << std::endl;
+				}
+			}
 
 			// First AXI-stream packet contains only 303-bits of frame payload, so there is a need to align
 			packet_out.data(303,0) = packet_in.data(511, 208);
 
 			// For each packet, part of JF header is saved
-			if ((packet_out.save == 1) && (packet_out.eth_packet == 0)) {
+			if (packet_out.save && (packet_out.eth_packet == 0)) {
 				ap_uint<28> hbm_addr = header.jf_frame_number * NMODULES + packet_out.module;
 				ap_uint<256> save_to_memory;
 				save_to_memory(63,0)    = header.jf_frame_number;
@@ -255,10 +266,10 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 				d_hbm_header[hbm_addr]  = save_to_memory;
 			}
 
-                        if ((packet_out.save == 1) || (packet_out.pedestal == 1))
-			    rcv_state = RCV_GOOD;
-                        else
-                            rcv_state = RCV_IGNORE;
+			if (packet_out.save || packet_out.pedestal)
+				rcv_state = RCV_GOOD;
+			else
+				rcv_state = RCV_IGNORE;
 			break;
 
 		case RCV_GOOD:
