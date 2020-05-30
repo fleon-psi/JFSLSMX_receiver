@@ -12,7 +12,7 @@
 #define API_VERSION "jf-0.1.0"
 #define KEV_OVER_ANGSTROM 12.398
 
-enum simplon_state_t {STATE_READY, STATE_ACQUIRE, STATE_ERROR, STATE_INITIALIZE, STATE_NA} simplon_state;
+enum daq_state_t {STATE_READY, STATE_ACQUIRE, STATE_ERROR, STATE_INITIALIZE, STATE_NA} daq_state;
 
 void update_summation() {
     if (experiment_settings.jf_full_speed) {
@@ -86,7 +86,7 @@ void default_parameters() {
 void detector_command(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
     auto command = request.param(":command").as<std::string>();
     if (command == "arm") {
-        if (simplon_state == STATE_READY) {
+        if (daq_state == STATE_READY) {
         // Arm
             std::cout << "Frames to collect:    " << experiment_settings.nframes_to_collect << std::endl;
             std::cout << "Frames to write:      " << experiment_settings.nframes_to_write << std::endl;
@@ -104,7 +104,7 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
             std::cout << "Full speed:           " << experiment_settings.jf_full_speed << std::endl;
             std::cout << "Name pattern:         " << writer_settings.HDF5_prefix << std::endl;
             std::cout << "Mode:                 " << writer_settings.write_hdf5 << std::endl;
-            simplon_state = STATE_ACQUIRE;
+            daq_state = STATE_ACQUIRE;
 
             // If pedestal is old (or settings changed), need to update it
             time_t now;
@@ -126,20 +126,20 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
             response.send(Pistache::Http::Code::Bad_Request);
         }
     } else if (command == "disarm") {
-        if (simplon_state == STATE_ACQUIRE) {
+        if (daq_state == STATE_ACQUIRE) {
             jfwriter_disarm();
             std::cout << "Disarm done" << std::endl;
             // Disarm done
-            simplon_state = STATE_READY;
+            daq_state = STATE_READY;
             response.send(Pistache::Http::Code::Ok);
         } else {
             response.send(Pistache::Http::Code::Bad_Request);
         }
     } else if (command == "cancel") {
-        if (simplon_state == STATE_ACQUIRE) {
+        if (daq_state == STATE_ACQUIRE) {
             std::cout << "Disarm" << std::endl;
             jfwriter_disarm();
-            simplon_state = STATE_READY;
+            daq_state = STATE_READY;
 
             // Disarm
             response.send(Pistache::Http::Code::Ok);
@@ -147,9 +147,9 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
             response.send(Pistache::Http::Code::Bad_Request);
         }
     } else if (command == "abort") {
-        if (simplon_state == STATE_ACQUIRE) {
+        if (daq_state == STATE_ACQUIRE) {
             jfwriter_disarm();
-            simplon_state = STATE_READY;
+            daq_state = STATE_READY;
             std::cout << "Disarm" << std::endl;
             // Disarm
             response.send(Pistache::Http::Code::Ok);
@@ -162,12 +162,12 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
         response.send(Pistache::Http::Code::Ok);
     } else if (command == "initialize") {
         std::cout << "Initialize" << std::endl;
-        if (simplon_state == STATE_ACQUIRE) {
+        if (daq_state == STATE_ACQUIRE) {
             // Disarm
             jfwriter_disarm();
             std::cout << "Disarm done" << std::endl;
         }
-        simplon_state = STATE_INITIALIZE;
+        daq_state = STATE_INITIALIZE;
 
         // Init
         default_parameters();
@@ -175,7 +175,7 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
         jfwriter_pedestalG1();        
         jfwriter_pedestalG2();        
 
-        simplon_state = STATE_READY;
+        daq_state = STATE_READY;
 
         response.send(Pistache::Http::Code::Ok);
     } else
@@ -183,7 +183,7 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
 }
 
 void detector_set(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
-    if (simplon_state != STATE_READY) {
+    if (daq_state != STATE_READY) {
         response.send(Pistache::Http::Code::Bad_Request);
         return;
     }
@@ -242,7 +242,7 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
 }
 
 void detector_get(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
-    if (simplon_state == STATE_NA) {
+    if (daq_state == STATE_NA) {
         response.send(Pistache::Http::Code::Bad_Request);
         return;
     }
@@ -338,7 +338,7 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
 }
 
 void filewriter_set(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
-    if (simplon_state != STATE_READY) {
+    if (daq_state != STATE_READY) {
         response.send(Pistache::Http::Code::Bad_Request);
         return;
     }
@@ -360,7 +360,7 @@ void filewriter_set(const Pistache::Rest::Request& request, Pistache::Http::Resp
 }
 
 void filewriter_get(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
-    if (simplon_state == STATE_NA) {
+    if (daq_state == STATE_NA) {
         response.send(Pistache::Http::Code::Bad_Request);
         return;
     }
@@ -376,7 +376,7 @@ void hello(const Pistache::Rest::Request& request, Pistache::Http::ResponseWrite
 
 void detector_state(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
     nlohmann::json j;
-    switch (simplon_state) {
+    switch (daq_state) {
         case STATE_READY:
             j = {"ready"};
             break;
@@ -394,7 +394,7 @@ void detector_state(const Pistache::Rest::Request& request, Pistache::Http::Resp
 }
 
 int main() {
-    simplon_state = STATE_NA;
+    daq_state = STATE_NA;
 
     default_parameters();
 
