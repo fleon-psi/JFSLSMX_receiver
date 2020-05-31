@@ -63,6 +63,8 @@ int jfwriter_arm() {
 #ifndef OFFLINE
         if (setup_detector() == 1) return 1;
 #endif
+        if (writer_settings.HDF5_prefix != "")
+            open_master_hdf5();
         if (writer_settings.write_hdf5 == true)
             open_data_hdf5();
 
@@ -118,7 +120,7 @@ int jfwriter_disarm() {
         close_detector();
 #endif
 	if (writer_settings.HDF5_prefix != "")
-            save_master_hdf5();
+            close_master_hdf5();
         return 0;
 }
 

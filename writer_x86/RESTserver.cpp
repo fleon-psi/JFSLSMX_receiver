@@ -12,6 +12,7 @@
 #define API_VERSION "jf-0.1.0"
 #define KEV_OVER_ANGSTROM 12.398
 
+pthread_mutex_t daq_state_mutex = PTHREAD_MUTEX_INITIALIZER;
 enum daq_state_t {STATE_READY, STATE_ACQUIRE, STATE_ERROR, STATE_INITIALIZE, STATE_NA} daq_state;
 
 void update_summation() {
@@ -171,10 +172,11 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
 
         // Init
         default_parameters();
+#ifndef OFFLINE
         jfwriter_pedestalG0();        
         jfwriter_pedestalG1();        
         jfwriter_pedestalG2();        
-
+#endif
         daq_state = STATE_READY;
 
         response.send(Pistache::Http::Code::Ok);
@@ -371,6 +373,7 @@ void filewriter_get(const Pistache::Rest::Request& request, Pistache::Http::Resp
 }
 
 void hello(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    std::cout << "Root accessed" << std::endl;
     response.send(Pistache::Http::Code::Ok, "SLS MX JUNGFRAU API: " API_VERSION "\n");
 }
 

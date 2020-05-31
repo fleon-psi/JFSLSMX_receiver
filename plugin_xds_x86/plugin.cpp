@@ -17,10 +17,10 @@
  * limitations under the License.
  */
 
-
-#include <pthread.h>
+#include <unistd.h>
 #include <iostream>
 #include <string>
+#include <pthread.h>
 #include <hdf5.h>
 
 #include "plugin.h"
@@ -201,7 +201,15 @@ int read_frame(int frame_number, int32_t *output) {
             hsize_t raw_size;
             H5Dget_chunk_storage_size(dataset_id, offset, &raw_size);
             char *raw_chunk = (char *) malloc(raw_size);
-            H5Dread_chunk(dataset_id, H5P_DEFAULT, offset, &filter_mask, raw_chunk);
+            h5ret = H5Dread_chunk(dataset_id, H5P_DEFAULT, offset, &filter_mask, raw_chunk);
+
+            int time = 0;
+            while ((h5ret < 0) && (time < 30000)) {
+                usleep(100);
+                H5Drefresh(dataset_id);
+                h5ret = H5Dread_chunk(dataset_id, H5P_DEFAULT, offset, &filter_mask, raw_chunk);
+                time++;
+            }
             pthread_mutex_unlock(&hdf5_mutex);
 
             // decompress & filter
@@ -262,7 +270,7 @@ void plugin_open(const char * filename,
     *error_flag = 0;
 
     setInfoArray(info_array);
-    master_file_id = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
+    master_file_id = H5Fopen(filename, H5F_ACC_RDONLY | H5F_ACC_SWMR_READ, H5P_DEFAULT);
 
     if (master_file_id < 0) {
         std::cerr << "HDF5 error opening: " << filename << std::endl;

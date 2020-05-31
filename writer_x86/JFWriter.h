@@ -25,11 +25,10 @@
 #endif
 
 #include "../JFApp.h"
-#define RDMA_RQ_SIZE 4096L // Maximum number of receive elements
+#define RDMA_RQ_SIZE 16000L // Maximum number of receive elements
 #define NCARDS       2
-
-#define YPIXEL                 (514L * NMODULES * NCARDS / 2)
-#define XPIXEL                 (2 * 1030L)
+#define YPIXEL       (514L * NMODULES * NCARDS / 2)
+#define XPIXEL       (2 * 1030L)
 
 #define LZ4_BLOCK_SIZE  0
 #define ZSTD_BLOCK_SIZE (8*514*1030)
@@ -107,11 +106,12 @@ extern time_t time_pedestalG1;
 extern time_t time_pedestalG2;
 extern time_t time_datacollection;
 
+int open_master_hdf5();
+int close_master_hdf5();
 int open_data_hdf5();
 int close_data_hdf5();
 int save_data_hdf(char *data, size_t size, size_t frame, int chunk);
-int save_master_hdf5();
-int pack_data_hdf5();
+int save_binary(char *data, size_t size, int frame_id, int thread_id);
 
 int jfwriter_arm();
 int jfwriter_disarm();
@@ -120,8 +120,6 @@ int jfwriter_close();
 int jfwriter_pedestalG0();
 int jfwriter_pedestalG1();
 int jfwriter_pedestalG2();
-
-int write_frame(char *data, size_t size, int frame_id, int thread_id);
 
 int setup_detector();
 int trigger_detector();
@@ -137,5 +135,13 @@ void mean_pedeG0(double out[NMODULES*NCARDS]);
 void mean_pedeG1(double out[NMODULES*NCARDS]);
 void mean_pedeG2(double out[NMODULES*NCARDS]);
 void count_bad_pixel(size_t out[NMODULES*NCARDS]);
+
+int setup_zeromq_context();
+int close_zeromq_context();
+int setup_zeromq_sockets(void **socket);
+int close_zeromq_sockets(void **socket);
+int setup_zeromq_pull_socket(void **socket, int number);
+int close_zeromq_pull_socket(void **socket);
+int send_zeromq(void *zeromq_socket, void *data, size_t data_size, int frame, int chunk);
 
 #endif // JFWRITER_H_

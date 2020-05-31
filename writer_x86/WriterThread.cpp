@@ -98,7 +98,7 @@ void *writer_thread(void* thread_arg) {
                         if (writer_settings.write_hdf5 == true)
                             save_data_hdf(ib_buffer_location, frame_size, frame_id, card_id);
                         else 
-		            write_frame(ib_buffer_location, frame_size, frame_id, card_id);
+		            save_binary(ib_buffer_location, frame_size, frame_id, card_id);
                         break;
 
                     case JF_COMPRESSION_BSHUF_LZ4:
@@ -108,7 +108,7 @@ void *writer_thread(void* thread_arg) {
                         if (writer_settings.write_hdf5 == true)
        	       	       	    save_data_hdf(compression_buffer, frame_size, frame_id, card_id);
        	       	       	else 
-		            write_frame(compression_buffer, frame_size, frame_id, card_id);
+		            save_binary(compression_buffer, frame_size, frame_id, card_id);
                         break;
 
                     case JF_COMPRESSION_BSHUF_ZSTD:
@@ -118,7 +118,7 @@ void *writer_thread(void* thread_arg) {
                         if (writer_settings.write_hdf5 == true)
        	       	       	    save_data_hdf(compression_buffer, frame_size, frame_id, card_id);
        	       	       	else 
-		            write_frame(compression_buffer, frame_size, frame_id, card_id);
+		            save_binary(compression_buffer, frame_size, frame_id, card_id);
                         break;       
                 }
 
