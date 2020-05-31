@@ -102,20 +102,20 @@ void *writer_thread(void* thread_arg) {
                         break;
 
                     case JF_COMPRESSION_BSHUF_LZ4:
-		        bshuf_write_uint64_BE(compression_buffer, COMPOSED_IMAGE_SIZE * experiment_settings.pixel_depth);
+		        bshuf_write_uint64_BE(compression_buffer, frame_size);
 		        bshuf_write_uint32_BE(compression_buffer + 8, LZ4_BLOCK_SIZE);
-                        frame_size = bshuf_compress_lz4(ib_buffer_location, compression_buffer + 12, COMPOSED_IMAGE_SIZE, experiment_settings.pixel_depth, LZ4_BLOCK_SIZE) + 12;
-                        if (writer_settings.write_hdf5 == true)
+                        frame_size = bshuf_compress_lz4(ib_buffer_location, compression_buffer + 12, frame_size / experiment_settings.pixel_depth, experiment_settings.pixel_depth, LZ4_BLOCK_SIZE) + 12;
+                        if (writer_settings.write_hdf5)
        	       	       	    save_data_hdf(compression_buffer, frame_size, frame_id, card_id);
        	       	       	else 
 		            save_binary(compression_buffer, frame_size, frame_id, card_id);
                         break;
 
                     case JF_COMPRESSION_BSHUF_ZSTD:
-		        bshuf_write_uint64_BE(compression_buffer, COMPOSED_IMAGE_SIZE * experiment_settings.pixel_depth);
+		        bshuf_write_uint64_BE(compression_buffer, frame_size);
 		        bshuf_write_uint32_BE(compression_buffer + 8, ZSTD_BLOCK_SIZE);
-                        frame_size = bshuf_compress_zstd(ib_buffer_location, compression_buffer + 12, COMPOSED_IMAGE_SIZE, experiment_settings.pixel_depth, ZSTD_BLOCK_SIZE) + 12;
-                        if (writer_settings.write_hdf5 == true)
+                        frame_size = bshuf_compress_zstd(ib_buffer_location, compression_buffer + 12, frame_size / experiment_settings.pixel_depth, experiment_settings.pixel_depth, ZSTD_BLOCK_SIZE) + 12;
+                        if (writer_settings.write_hdf5)
        	       	       	    save_data_hdf(compression_buffer, frame_size, frame_id, card_id);
        	       	       	else 
 		            save_binary(compression_buffer, frame_size, frame_id, card_id);
