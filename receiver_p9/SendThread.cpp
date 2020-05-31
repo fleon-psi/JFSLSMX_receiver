@@ -26,8 +26,6 @@ uint32_t lastModuleFrameNumber() {
     for (int i = 1; i < NMODULES; i++) {
         if (online_statistics->head[i] < retVal) retVal = online_statistics->head[i];
     }
-    // if (retVal >= experiment_settings.nframes_to_collect - 1) return UINT32_MAX; // All frames were collected
-    // <-- This is done in FPGA image already
     return retVal;
 }
 
