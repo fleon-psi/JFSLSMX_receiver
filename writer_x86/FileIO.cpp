@@ -1,3 +1,4 @@
+#include <sys/stat.h>
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -19,6 +20,7 @@
 
 #define HDF5_ERROR(ret,func) if (ret) printf("%s(%d) %s: err = %d\n",__FILE__,__LINE__, #func, ret), exit(ret)
 
+
 hid_t master_file_id;
 hid_t master_file_fapl;
 
@@ -31,12 +33,18 @@ hid_t *data_hdf5_dataspace;
 
 pthread_mutex_t hdf5_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-void make_dirs(std::string path) {
+int make_dir(std::string path) {
     int pos = path.rfind("/");
     if (pos != std::string::npos) {
-        std::cout << "Making directory " <<path.substr(0,pos) << std::endl;
-//        std::filesystem::create_directories(path.substr(0,pos));
+        std::cout << "Making directory " << path.substr(0,pos) << std::endl;
+
+        std::string directory = path.substr(0,pos);
+        make_dir(directory); // For directories upstream, errors are ignored.
+
+        int ret = mkdir (directory.c_str(),  S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+        if ((ret == -1) && (errno != EEXIST)) return 1; 
     }
+    return 0;
 }
 
 int createDataChunkLink(std::string filename, hid_t location, std::string name, std::string remote) {
@@ -476,12 +484,13 @@ void write_metrology() {
 int open_master_hdf5() {
 	std::string filename = "";
 	if (writer_settings.main_location != "") { 
-             make_dirs(writer_settings.main_location + "/" + writer_settings.HDF5_prefix);
              filename =
 			writer_settings.main_location + "/" +
 			writer_settings.HDF5_prefix + "_master.h5";
         }
 	else filename = writer_settings.HDF5_prefix + "_master.h5";
+         
+        make_dir(filename);
 
         // Set to use the latest library format
         master_file_fapl = H5Pcreate(H5P_FILE_ACCESS);
