@@ -287,10 +287,14 @@ static int process_action(rx100g_mem_t *din_gmem,
 	eth_settings.frame_number_to_stop = act_reg->Data.expected_frames;
 	eth_settings.frame_number_to_quit = act_reg->Data.expected_frames + DELAY_FRAMES_STOP_AND_QUIT;
 	eth_settings.first_frame_number = act_reg->Data.first_frame_number;
-        eth_settings.pedestalG0_frames = act_reg->Data.pedestalG0_frames;
         eth_settings.expected_triggers = act_reg->Data.expected_triggers;
         eth_settings.frames_per_trigger = act_reg->Data.frames_per_trigger;
         eth_settings.delay_per_trigger = act_reg->Data.delay_per_trigger;
+
+        if ((act_reg->Data.mode == MODE_CONV) || (act_reg->Data.mode == MODE_CONV_BSHUF))
+            eth_settings.pedestalG0_frames = act_reg->Data.pedestalG0_frames;
+        else eth_settings.pedestalG0_frames = 0; // This is only necessary for conversion
+
 
 	conversion_settings_t conversion_settings;
 
