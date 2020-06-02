@@ -106,6 +106,11 @@ extern time_t time_pedestalG1;
 extern time_t time_pedestalG2;
 extern time_t time_datacollection;
 
+extern double mean_pedestalG0[NMODULES*NCARDS];
+extern double mean_pedestalG1[NMODULES*NCARDS];
+extern double mean_pedestalG2[NMODULES*NCARDS];
+extern size_t bad_pixels[NMODULES*NCARDS];
+
 int open_master_hdf5();
 int close_master_hdf5();
 int open_data_hdf5();

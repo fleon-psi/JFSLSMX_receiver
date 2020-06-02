@@ -13,7 +13,66 @@
 #define KEV_OVER_ANGSTROM 12.398
 
 pthread_mutex_t daq_state_mutex = PTHREAD_MUTEX_INITIALIZER;
-enum daq_state_t {STATE_READY, STATE_ACQUIRE, STATE_ERROR, STATE_INITIALIZE, STATE_NA} daq_state;
+enum daq_state_t {STATE_READY, STATE_ACQUIRE, STATE_ERROR, STATE_CHANGE, STATE_NOT_INITIALIZED} daq_state;
+
+std::string state_to_string() {
+   switch (daq_state) {
+       case STATE_READY:
+           return "Ready";
+       case STATE_ACQUIRE:
+           return "Acquiring";
+       case STATE_ERROR:
+           return "Error";
+       case STATE_CHANGE:
+           return "In progress";
+       case STATE_NOT_INITIALIZED:
+           return "Not initialized";
+       default:
+           return "";
+   }
+}
+
+void full_status(nlohmann::json &j) {
+    j["frame_time_detector"] = experiment_settings.frame_time_detector;
+    j["count_time_detector"] = experiment_settings.count_time_detector;
+    j["frame_time"] = experiment_settings.frame_time;
+    j["count_time"] = experiment_settings.count_time;
+    j["shutter_delay"] = experiment_settings.shutter_delay;
+    j["beamline_delay"] = experiment_settings.beamline_delay;
+    j["pedestalG0_frames"] = experiment_settings.pedestalG0_frames;
+    j["pedestalG1_frames"] = experiment_settings.pedestalG1_frames;
+    j["pedestalG2_frames"] = experiment_settings.pedestalG2_frames;
+    j["summation"] = experiment_settings.summation;
+    j["pixel_depth"] = experiment_settings.pixel_depth;
+    j["ntrigger"] = experiment_settings.ntrigger;
+    j["hdf5_prefix"] = writer_settings.HDF5_prefix;
+    j["write_hdf5"] = writer_settings.write_hdf5;
+    j["jf_full_speed"] = experiment_settings.jf_full_speed;
+    j["nframes_to_collect"] = experiment_settings.nframes_to_collect;
+    j["nframes_to_write"] = experiment_settings.nframes_to_write;
+
+    j["beam_center_x"] = experiment_settings.beam_x;
+    j["beam_center_y"] = experiment_settings.beam_y;
+    j["detector_distance"] = experiment_settings.detector_distance;
+    j["energy_in_keV"] = experiment_settings.energy_in_keV;
+
+    if (writer_settings.compression == JF_COMPRESSION_NONE) j["compression"] = ""; 
+    else if (writer_settings.compression == JF_COMPRESSION_BSHUF_LZ4) j["compression"] = "bslz4"; 
+    else if (writer_settings.compression == JF_COMPRESSION_BSHUF_ZSTD) j["compression"] = "bszstd"; 
+
+    time_t now;
+    time(&now);
+    j["pedestalG0_age"] = (uint64_t)(time - time_pedestalG0);
+    j["pedestalG1_age"] = (uint64_t)(time - time_pedestalG1);
+    j["pedestalG2_age"] = (uint64_t)(time - time_pedestalG2);
+    for (int i = 0; i < NCARDS * NMODULES; i++) {
+        j["pedestalG0_mean_mod"+std::to_string(i)] = mean_pedestalG0[i];
+        j["pedestalG1_mean_mod"+std::to_string(i)] = mean_pedestalG1[i];
+        j["pedestalG2_mean_mod"+std::to_string(i)] = mean_pedestalG2[i];
+        j["bad_pixels_mod"+std::to_string(i)] = bad_pixels[i];
+    } 
+    j["state"] = state_to_string();
+}
 
 void update_summation() {
     if (experiment_settings.jf_full_speed) {
@@ -59,14 +118,10 @@ void default_parameters() {
     writer_settings.write_hdf5 = true;
     writer_settings.images_per_file = 1000;
     writer_settings.nthreads = NCARDS * 8; // Spawn 8 writer threads per card
-    writer_settings.nlocations = 0;
     writer_settings.timing_trigger = true;
 
-    writer_settings.nlocations = 4;
-    writer_settings.data_location[0] = "/mnt/n0ram/";
-    writer_settings.data_location[1] = "/mnt/n1ram/";
-    writer_settings.data_location[2] = "/mnt/n2ram/";
-    writer_settings.data_location[3] = "/mnt/n3ram/";
+    writer_settings.nlocations = 1;
+    writer_settings.data_location[0] = "/mnt/n2ssd";
     writer_settings.main_location = "/mnt/n2ssd/";
 
     //These parameters are not changeable at the moment
@@ -85,27 +140,14 @@ void default_parameters() {
 
 // TODO: Wrong parameters should raise errors
 void detector_command(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
+
+    pthread_mutex_lock(&daq_state_mutex);
     auto command = request.param(":command").as<std::string>();
     if (command == "arm") {
         if (daq_state == STATE_READY) {
-        // Arm
-            std::cout << "Frames to collect:    " << experiment_settings.nframes_to_collect << std::endl;
-            std::cout << "Frames to write:      " << experiment_settings.nframes_to_write << std::endl;
-            std::cout << "Conversion mode:      " << (uint32_t) experiment_settings.conversion_mode << std::endl;
-            std::cout << "Summation:            " << experiment_settings.summation << std::endl;
-            std::cout << "Pixel depth:          " << experiment_settings.pixel_depth << std::endl;
-            std::cout << "Pedestal G0 frames:   " << experiment_settings.pedestalG0_frames << std::endl;
-            std::cout << "Pedestal G1 frames:   " << experiment_settings.pedestalG1_frames << std::endl;
-            std::cout << "Pedestal G2 frames:   " << experiment_settings.pedestalG2_frames << std::endl;
-            std::cout << "Ntrigger:             " << experiment_settings.ntrigger << std::endl;
-            std::cout << "Count time:           " << experiment_settings.count_time << std::endl;
-            std::cout << "Frame time:           " << experiment_settings.frame_time << std::endl;
-            std::cout << "Beamline delay:       " << experiment_settings.beamline_delay << std::endl;
-            std::cout << "Shutter delay:        " << experiment_settings.shutter_delay << std::endl;
-            std::cout << "Full speed:           " << experiment_settings.jf_full_speed << std::endl;
-            std::cout << "Name pattern:         " << writer_settings.HDF5_prefix << std::endl;
-            std::cout << "Mode:                 " << writer_settings.write_hdf5 << std::endl;
-            daq_state = STATE_ACQUIRE;
+            // Arm
+            daq_state = STATE_CHANGE;
 
             // If pedestal is old (or settings changed), need to update it
             time_t now;
@@ -123,11 +165,13 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
             jfwriter_arm();
             std::cout << "Arm done" << std::endl;
             response.send(Pistache::Http::Code::Ok);
+            daq_state = STATE_ACQUIRE;
         } else {
             response.send(Pistache::Http::Code::Bad_Request);
         }
     } else if (command == "disarm") {
         if (daq_state == STATE_ACQUIRE) {
+            daq_state = STATE_CHANGE;
             jfwriter_disarm();
             std::cout << "Disarm done" << std::endl;
             // Disarm done
@@ -136,19 +180,9 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
         } else {
             response.send(Pistache::Http::Code::Bad_Request);
         }
-    } else if (command == "cancel") {
-        if (daq_state == STATE_ACQUIRE) {
-            std::cout << "Disarm" << std::endl;
-            jfwriter_disarm();
-            daq_state = STATE_READY;
-
-            // Disarm
-            response.send(Pistache::Http::Code::Ok);
-        } else {
-            response.send(Pistache::Http::Code::Bad_Request);
-        }
     } else if (command == "abort") {
         if (daq_state == STATE_ACQUIRE) {
+            daq_state = STATE_CHANGE;
             jfwriter_disarm();
             daq_state = STATE_READY;
             std::cout << "Disarm" << std::endl;
@@ -157,34 +191,47 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
         } else {
             response.send(Pistache::Http::Code::Bad_Request);
         }
-
-    } else if (command == "status_update") {
-        // Status update
-        response.send(Pistache::Http::Code::Ok);
     } else if (command == "initialize") {
         std::cout << "Initialize" << std::endl;
+        daq_state = STATE_CHANGE;
+
         if (daq_state == STATE_ACQUIRE) {
             // Disarm
             jfwriter_disarm();
             std::cout << "Disarm done" << std::endl;
         }
-        daq_state = STATE_INITIALIZE;
 
         // Init
         default_parameters();
-#ifndef OFFLINE
         jfwriter_pedestalG0();        
         jfwriter_pedestalG1();        
         jfwriter_pedestalG2();        
-#endif
         daq_state = STATE_READY;
 
         response.send(Pistache::Http::Code::Ok);
-    } else
+    } else if (command == "pedestal") {
+        if (daq_state != STATE_READY) {
+            response.send(Pistache::Http::Code::Bad_Request);
+        } else {
+            daq_state = STATE_CHANGE;
+
+            jfwriter_pedestalG0();        
+            jfwriter_pedestalG1();        
+            jfwriter_pedestalG2();        
+
+            daq_state = STATE_READY;
+
+            response.send(Pistache::Http::Code::Ok);
+        }
+    } else {
         response.send(Pistache::Http::Code::Not_Found);
+    }
+    pthread_mutex_unlock(&daq_state_mutex);
 }
 
 void detector_set(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    pthread_mutex_lock(&daq_state_mutex);
+
     if (daq_state != STATE_READY) {
         response.send(Pistache::Http::Code::Bad_Request);
         return;
@@ -240,12 +287,15 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
          return;
     }
     update_summation();
+    pthread_mutex_unlock(&daq_state_mutex);
+
     response.send(Pistache::Http::Code::Ok, json_output.dump(), MIME(Application, Json));
 }
 
 void detector_get(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
-    if (daq_state == STATE_NA) {
-        response.send(Pistache::Http::Code::Bad_Request);
+    response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
+    if (daq_state == STATE_NOT_INITIALIZED) {
+        response.send(Pistache::Http::Code::Bad_Request, "Variables have no meaning before initialization");
         return;
     }
 
@@ -288,42 +338,6 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
         if (experiment_settings.conversion_mode == MODE_RAW) j["value"] = "raw";
         if (experiment_settings.conversion_mode == MODE_PEDEG1) j["value"] = "pedestalG1";
         if (experiment_settings.conversion_mode == MODE_PEDEG2) j["value"] = "pedestalG2";
-    } else if (variable == "mean_pedestalG0") {
-        double out[NMODULES*NCARDS];        
-        mean_pedeG0(out);
-        double sum;
-        for (int i = 0; i < NMODULES * NCARDS; i++) {
-           sum += out[i];
-           j["mod"+std::to_string(i)] = out[i];
-        }
-        j["all"] = sum / (NMODULES * NCARDS);
-    } else if (variable == "mean_pedestalG1") {
-        double out[NMODULES*NCARDS];        
-        mean_pedeG1(out);
-        double sum;
-        for (int i = 0; i < NMODULES * NCARDS; i++) {
-           sum += out[i];
-           j["mod"+std::to_string(i)] = out[i];
-        }
-        j["all"] = sum / (NMODULES * NCARDS);
-    } else if (variable == "mean_pedestalG2") {
-        double out[NMODULES*NCARDS];        
-        mean_pedeG2(out);
-        double sum;
-        for (int i = 0; i < NMODULES * NCARDS; i++) {
-           sum += out[i];
-           j["mod"+std::to_string(i)] = out[i];
-        }
-        j["all"] = sum / (NMODULES * NCARDS);
-    } else if (variable == "bad_pixels") {
-        size_t out[NMODULES*NCARDS];        
-        count_bad_pixel(out);
-        size_t sum;
-        for (int i = 0; i < NMODULES * NCARDS; i++) {
-           sum += out[i];
-           j["mod"+std::to_string(i)] = out[i];
-        }
-        j["all"] = sum;
     } else if (variable == "pedestalG0") {
          response.send(Pistache::Http::Code::Ok, (char *) gain_pedestal.pedeG0, NCARDS * NPIXEL * sizeof(uint16_t), MIME(Application, OctetStream));    
     } else if (variable == "pedestalG1") {
@@ -340,6 +354,8 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
 }
 
 void filewriter_set(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    pthread_mutex_lock(&daq_state_mutex);
+
     if (daq_state != STATE_READY) {
         response.send(Pistache::Http::Code::Bad_Request);
         return;
@@ -358,11 +374,13 @@ void filewriter_set(const Pistache::Rest::Request& request, Pistache::Http::Resp
 	 response.send(Pistache::Http::Code::Not_Found, "Key " + variable + " doesn't exists");
          return;
     }
+
+    pthread_mutex_unlock(&daq_state_mutex);
     response.send(Pistache::Http::Code::Ok, json_output.dump(), MIME(Application, Json));
 }
 
 void filewriter_get(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
-    if (daq_state == STATE_NA) {
+    if (daq_state == STATE_NOT_INITIALIZED) {
         response.send(Pistache::Http::Code::Bad_Request);
         return;
     }
@@ -372,32 +390,22 @@ void filewriter_get(const Pistache::Rest::Request& request, Pistache::Http::Resp
     response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));
 }
 
-void hello(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
-    std::cout << "Root accessed" << std::endl;
-    response.send(Pistache::Http::Code::Ok, "SLS MX JUNGFRAU API: " API_VERSION "\n");
-}
-
 void detector_state(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
     nlohmann::json j;
-    switch (daq_state) {
-        case STATE_READY:
-            j = {"ready"};
-            break;
-        case STATE_ACQUIRE:
-            j = {"acquire"};
-            break;
-        case STATE_ERROR:
-            j = {"error"};
-            break;
-        case STATE_NA:
-            j = {"na"};
-            break;
-    }
+    j = state_to_string();
     response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));            
 }
 
+void full_detector_state(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
+    nlohmann::json j;
+    full_status(j);
+    response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));
+}
+
 int main() {
-    daq_state = STATE_NA;
+    daq_state = STATE_NOT_INITIALIZED;
 
     default_parameters();
 
@@ -408,6 +416,7 @@ int main() {
 
     Pistache::Rest::Router router;
     Pistache::Rest::Routes::Put(router, "/detector/api/" API_VERSION "/command/:command", Pistache::Rest::Routes::bind(&detector_command));
+    Pistache::Rest::Routes::Get(router, "/detector/api/" API_VERSION "/command/:command", Pistache::Rest::Routes::bind(&detector_command));
     Pistache::Rest::Routes::Put(router, "/detector/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&detector_set));
     Pistache::Rest::Routes::Get(router, "/detector/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&detector_get));
     Pistache::Rest::Routes::Get(router, "/detector/api/" API_VERSION "/status/state", Pistache::Rest::Routes::bind(&detector_state));
@@ -415,9 +424,9 @@ int main() {
     Pistache::Rest::Routes::Put(router, "/filewriter/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&filewriter_set));
     Pistache::Rest::Routes::Get(router, "/filewriter/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&filewriter_get));
 
-    Pistache::Rest::Routes::Get(router, "/", Pistache::Rest::Routes::bind(&hello));
+    Pistache::Rest::Routes::Get(router, "/", Pistache::Rest::Routes::bind(&full_detector_state));
 
-    auto opts = Pistache::Http::Endpoint::options().threads(1);
+    auto opts = Pistache::Http::Endpoint::options().threads(2);
     Pistache::Http::Endpoint server(addr);
     server.init(opts);
     server.setHandler(router.handler());

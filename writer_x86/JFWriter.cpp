@@ -26,6 +26,11 @@
 #include "../bitshuffle/bitshuffle.h"
 #include "../bitshuffle/bshuf_h5filter.h"
 
+double mean_pedestalG0[NMODULES*NCARDS];
+double mean_pedestalG1[NMODULES*NCARDS];
+double mean_pedestalG2[NMODULES*NCARDS];
+size_t bad_pixels[NMODULES*NCARDS];
+
 int jfwriter_setup() {
         // Register HDF5 bitshuffle filter
         H5Zregister(bshuf_H5Filter);
@@ -124,13 +129,13 @@ int jfwriter_disarm() {
         return 0;
 }
 
-void mean_pedeG0(double out[NMODULES*NCARDS]) {
+void calc_mean_pedestal(uint16_t in[NCARDS*NPIXEL], double out[NMODULES*NCARDS]) {
     for (size_t i = 0; i < NMODULES * NCARDS; i++) {
         double sum = 0;
         double count = 0;
         for (size_t j = 0; j < MODULE_COLS*MODULE_LINES; j++) {
            if (gain_pedestal.pixel_mask[i * MODULE_COLS * MODULE_LINES + j] == 0) {
-               sum += gain_pedestal.pedeG0[i * MODULE_COLS * MODULE_LINES + j] / 4.0;
+               sum += in[i * MODULE_COLS * MODULE_LINES + j] / 4.0;
                count += 1.0;
            }
         }
@@ -138,42 +143,14 @@ void mean_pedeG0(double out[NMODULES*NCARDS]) {
     }
 }
 
-void mean_pedeG1(double out[NMODULES*NCARDS]) {
-    for (size_t i = 0; i < NMODULES * NCARDS; i++) {
-        double sum = 0;
-        double count = 0;
-        for (size_t j = 0; j < MODULE_COLS*MODULE_LINES; j++) {
-           if (gain_pedestal.pixel_mask[i * MODULE_COLS * MODULE_LINES + j] == 0) {
-               sum += gain_pedestal.pedeG1[i * MODULE_COLS * MODULE_LINES + j] / 4.0;
-               count += 1.0;
-           }
-        }
-        out[i] = sum / count;
-    }
-}
-
-void mean_pedeG2(double out[NMODULES*NCARDS]) {
-    for (size_t i = 0; i < NMODULES * NCARDS; i++) {
-        double sum = 0;
-        double count = 0;
-        for (size_t j = 0; j < MODULE_COLS*MODULE_LINES; j++) {
-           if (gain_pedestal.pixel_mask[i * MODULE_COLS * MODULE_LINES + j] == 0) {
-               sum += gain_pedestal.pedeG2[i * MODULE_COLS * MODULE_LINES + j] / 4.0;
-               count += 1.0;
-           }
-        }
-        out[i] = sum / count;
-    }
-}
-
-void count_bad_pixel(size_t out[NMODULES*NCARDS]) {
+void count_bad_pixel() {
     for (size_t i = 0; i < NMODULES * NCARDS; i++) {
         size_t count = 0;
         for (size_t j = 0; j < MODULE_COLS*MODULE_LINES; j++) {
            if (gain_pedestal.pixel_mask[i * MODULE_COLS * MODULE_LINES + j] != 0)
               count ++;           
         }
-        out[i] = count;
+        bad_pixels[i] = count;
     }
 }
 
@@ -190,6 +167,8 @@ int jfwriter_pedestalG0() {
     time_pedestalG0 = time_datacollection;    
 
     experiment_settings = tmp_settings;
+    calc_mean_pedestal(gain_pedestal.pedeG0, mean_pedestalG0);
+    count_bad_pixel();
     return 0;
 }
 
@@ -207,6 +186,8 @@ int jfwriter_pedestalG1() {
     time_pedestalG1 = time_datacollection;    
     
     experiment_settings = tmp_settings;
+    calc_mean_pedestal(gain_pedestal.pedeG1, mean_pedestalG1);
+    count_bad_pixel();
     return 0;
 }
 
@@ -224,5 +205,7 @@ int jfwriter_pedestalG2() {
     time_pedestalG2 = time_datacollection;
     
     experiment_settings = tmp_settings;
+    calc_mean_pedestal(gain_pedestal.pedeG2, mean_pedestalG2);
+    count_bad_pixel();
     return 0;
 }

@@ -4,7 +4,6 @@
 #include <fstream>
 
 #include <hdf5.h>
-//#include <filesystem>
 
 #include "../bitshuffle/bitshuffle.h"
 #include "../bitshuffle/bshuf_h5filter.h"
@@ -36,8 +35,6 @@ pthread_mutex_t hdf5_mutex = PTHREAD_MUTEX_INITIALIZER;
 int make_dir(std::string path) {
     int pos = path.rfind("/");
     if (pos != std::string::npos) {
-        std::cout << "Making directory " << path.substr(0,pos) << std::endl;
-
         std::string directory = path.substr(0,pos);
         make_dir(directory); // For directories upstream, errors are ignored.
 
@@ -503,7 +500,7 @@ int open_master_hdf5() {
 		return 1;
 	}
 
-        H5Fstart_swmr_write(master_file_id);
+//        H5Fstart_swmr_write(master_file_id);
 
 	hid_t grp = createGroup(master_file_id, "/entry", "NXentry");
         saveString(grp,"definition", "NXmx");
@@ -691,7 +688,7 @@ int open_data_hdf5() {
 		return 1;
 	}
 
-        H5Fstart_swmr_write(data_hdf5[i]);
+//        H5Fstart_swmr_write(data_hdf5[i]);
  
 	hid_t grp = createGroup(data_hdf5[i], "/entry", "NXentry");
 	H5Gclose(grp);
@@ -725,14 +722,12 @@ int open_data_hdf5() {
             case JF_COMPRESSION_BSHUF_LZ4:
 	    {
 		unsigned int params[] = {LZ4_BLOCK_SIZE, BSHUF_H5_COMPRESS_LZ4};
-                std::cout << "H5 " << params[1] << std::endl;
 		h5ret = H5Pset_filter(data_hdf5_dcpl[i], (H5Z_filter_t)BSHUF_H5FILTER, H5Z_FLAG_MANDATORY, experiment_settings.pixel_depth, params);
 		HDF5_ERROR(h5ret,H5Pset_filter);
 		break;
 	    }
 	    case JF_COMPRESSION_BSHUF_ZSTD:
 	    {
-                std::cout << "ZSTD" << std::endl;
 		unsigned int params[] = {ZSTD_BLOCK_SIZE, BSHUF_H5_COMPRESS_ZSTD};
 		h5ret = H5Pset_filter(data_hdf5_dcpl[i], (H5Z_filter_t)BSHUF_H5FILTER, H5Z_FLAG_MANDATORY, experiment_settings.pixel_depth, params);
 		HDF5_ERROR(h5ret,H5Pset_filter);
