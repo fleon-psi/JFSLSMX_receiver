@@ -160,3 +160,22 @@ int close_detector() {
 #endif
         return 0;
 }
+
+bool detector_power_status() {
+}
+
+int powerup_detector() {
+        det->setPowerChip(1);
+        sleep(5);
+        det->setHighVoltage(0);
+        sleep(5);
+}
+
+int shutdown_detector() {
+        det->stopDetector();
+        det->setHighVoltage(0);
+        sleep(5);
+        det->setPowerChip(0);
+        sleep(5);
+}
+
