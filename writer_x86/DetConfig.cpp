@@ -93,7 +93,6 @@ int trigger_omega() {
 int setup_detector() {
 #ifndef OFFLINE
         det->stopDetector();
-
         det->setStartingFrameNumber(1);
         det->setNumberOfFrames(experiment_settings.nframes_to_collect + DELAY_FRAMES_STOP_AND_QUIT+1);
         if (det->size() != NMODULES * NCARDS) {
@@ -162,20 +161,23 @@ int close_detector() {
 }
 
 bool detector_power_status() {
+    return false;
 }
 
 int powerup_detector() {
-        det->setPowerChip(1);
-        sleep(5);
-        det->setHighVoltage(0);
-        sleep(5);
+    det->setPowerChip(1);
+    sleep(5);
+    det->setHighVoltage(0);
+    sleep(5);
+    return 0;
 }
 
 int shutdown_detector() {
-        det->stopDetector();
-        det->setHighVoltage(0);
-        sleep(5);
-        det->setPowerChip(0);
-        sleep(5);
+   det->stopDetector();
+   det->setHighVoltage(0);
+   sleep(5);
+   det->setPowerChip(0);
+   sleep(5);
+   return 0;
 }
 

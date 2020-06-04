@@ -18,6 +18,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <stdexcept>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <algorithm>
@@ -35,11 +36,15 @@ int jfwriter_setup() {
         // Register HDF5 bitshuffle filter
         H5Zregister(bshuf_H5Filter);
 #ifndef OFFLINE
-        det = new sls::Detector();
+        try {
+            det = new sls::Detector();
+        } catch (const std::runtime_error& error) {
+            return 1;
+        }
 #endif
 	for (int i = 0; i < NCARDS; i++) {
             // Setup IB and allocate memory
-            setup_infiniband(i);
+            if (setup_infiniband(i)) return 1;
 	    pthread_mutex_init(&(remaining_frames_mutex[i]), NULL);
 	}
         return 0;
@@ -59,7 +64,7 @@ int jfwriter_close() {
 
 int jfwriter_arm() {
 	for (int i = 0; i < NCARDS; i++) {
-            connect_to_power9(i);
+            if (connect_to_power9(i)) return 1;
 	    remaining_frames[i] = experiment_settings.nframes_to_write;
 	}
 
@@ -69,16 +74,16 @@ int jfwriter_arm() {
         if (setup_detector() == 1) return 1;
 #endif
         if (writer_settings.HDF5_prefix != "")
-            open_master_hdf5();
+            if (open_master_hdf5()) return 1;;
         if (writer_settings.write_hdf5 == true)
-            open_data_hdf5();
+            if (open_data_hdf5()) return 1;
 
         writer = (pthread_t *) calloc(writer_settings.nthreads, sizeof(pthread_t));
         writer_thread_arg = (writer_thread_arg_t *) calloc(writer_settings.nthreads, sizeof(writer_thread_arg_t));
 
         // Barrier #1 - All threads on P9 are set up running
 	for (int i = 0; i < NCARDS; i++)
-            exchange_magic_number(writer_connection_settings[i].sockfd);
+            if (exchange_magic_number(writer_connection_settings[i].sockfd)) return 1;
 
 	if (experiment_settings.nframes_to_write > 0) {
 		for (int i = 0; i < writer_settings.nthreads; i++) {
@@ -94,7 +99,7 @@ int jfwriter_arm() {
 
         // Barrier #2 - All threads are set up running
 	for (int i = 0; i < NCARDS; i++)
-            exchange_magic_number(writer_connection_settings[i].sockfd);
+            if (exchange_magic_number(writer_connection_settings[i].sockfd)) return 1;
 	
 #ifndef OFFLINE
         trigger_detector();
@@ -120,7 +125,7 @@ int jfwriter_disarm() {
 
         // Involves barrier after collecting data
 	for (int i = 0; i < NCARDS; i++)
-            disconnect_from_power9(i);
+            if (disconnect_from_power9(i)) return 1;
 #ifndef OFFLINE        
         close_detector();
 #endif
@@ -182,7 +187,6 @@ int jfwriter_pedestalG1() {
 
     if (jfwriter_arm() == 1) return 1;
     if (jfwriter_disarm() == 1) return 1;
-
     time_pedestalG1 = time_datacollection;    
     
     experiment_settings = tmp_settings;
