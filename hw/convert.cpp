@@ -91,7 +91,7 @@ void pedestalG0(DATA_STREAM &in, DATA_STREAM &out, conversion_settings_t convers
 	out << packet_in;
 }
 
-void convert_and_shuffle(ap_uint<512> data_in, ap_uint<512> &data_out,
+void convert(ap_uint<512> data_in, ap_uint<512> &data_out,
 		ap_uint<18*32> after_pedeG0,
 		ap_uint<256> packed_gainG0_1, ap_uint<256> packed_gainG0_2,
 		ap_uint<256> packed_gainG1_1, ap_uint<256> packed_gainG1_2,
@@ -121,7 +121,6 @@ void convert_and_shuffle(ap_uint<512> data_in, ap_uint<512> &data_out,
 	unpack_gainG1G2(packed_gainG2_1, packed_gainG2_2, gainG2);
 
 	Convert: for (int i = 0; i < 32; i++) {
-
 		if (in_val[i] == 0xc000) out_val[i] = 32766; // can saturate G2 - overload
 		else if (in_val[i] == 0xffff) out_val[i] = -32763; //error
 		else if (in_val[i] == 0x4000) out_val[i] = -32764; //cannot saturate G1 - error
@@ -170,10 +169,11 @@ void convert_and_shuffle(ap_uint<512> data_in, ap_uint<512> &data_out,
 	case OUTPUT_CONV:
 		data_pack(data_out, out_val);
 		break;
-	case OUTPUT_CONV_BSHUF:
-		data_shuffle(data_out, out_val);
-		break;
+//	case OUTPUT_CONV_BSHUF:
+//		data_shuffle(data_out, out_val);
+//		break;
 	default:
+// RAW + all pedestal modes return raw data to host memory
 		data_out = data_in;
 		break;
 	}
@@ -213,7 +213,7 @@ void apply_gain_correction(DATA_STREAM &in, DATA_STREAM &out,
 			for (int i = 0; i < HBM_BURST_G1G2; i ++) {
 				data_packet_t packet_out = packet_in;
 				ap_uint<512> tmp_out;
-				convert_and_shuffle(packet_in.data, packet_out.data, packet_in.conv_data,
+				convert(packet_in.data, packet_out.data, packet_in.conv_data,
 						packed_gainG0_1[i],packed_gainG0_2[i],
 						packed_gainG1_1[i],packed_gainG1_2[i],
 						packed_gainG2_1[i],packed_gainG2_2[i],

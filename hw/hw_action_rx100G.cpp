@@ -291,21 +291,18 @@ static int process_action(rx100g_mem_t *din_gmem,
         eth_settings.frames_per_trigger = act_reg->Data.frames_per_trigger;
         eth_settings.delay_per_trigger = act_reg->Data.delay_per_trigger;
 
-        if ((act_reg->Data.mode == MODE_CONV) || (act_reg->Data.mode == MODE_CONV_BSHUF))
+        if (act_reg->Data.mode == MODE_CONV)
             eth_settings.pedestalG0_frames = act_reg->Data.pedestalG0_frames;
         else eth_settings.pedestalG0_frames = 0; // This is only necessary for conversion
 
 
 	conversion_settings_t conversion_settings;
 
-	if (act_reg->Data.mode == MODE_CONV_BSHUF) conversion_settings.conversion_mode = MODE_CONV;
-	else conversion_settings.conversion_mode = act_reg->Data.mode;
-
+	conversion_settings.conversion_mode = act_reg->Data.mode;
 	conversion_settings.tracking_threshold = 0;
 
 	ap_uint<2> output_type;
-	if (act_reg->Data.mode == MODE_CONV_BSHUF) output_type = OUTPUT_CONV_BSHUF;
-	else if (act_reg->Data.mode == MODE_CONV) output_type = OUTPUT_CONV;
+	if (act_reg->Data.mode == MODE_CONV) output_type = OUTPUT_CONV;
 	else output_type = OUTPUT_RAW;
 
 	// Load constants
