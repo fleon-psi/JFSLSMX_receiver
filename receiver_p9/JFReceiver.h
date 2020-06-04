@@ -17,8 +17,9 @@
 #ifndef _JFRECEIVER_H
 #define _JFRECEIVER_H
 
-#include "../JFApp.h"
+#include <vector>
 
+#include "../JFApp.h"
 #define FRAME_LIMIT 1000000L
 
 #define RECEIVING_DELAY 5
@@ -51,6 +52,19 @@ struct receiver_settings_t {
         int gpu_device;
 };
 extern receiver_settings_t receiver_settings;
+
+// Definition of Bragg spot
+struct spot_t {
+    double x,y,z;
+    uint16_t module; // number of module - it is impossible for spot to belong to more than one module
+    uint64_t photons; // total photon count
+    uint64_t pixels; // number of pixels
+    uint64_t depth; // on how many frames the spot is present
+};
+
+// Vector containing all spots in the dataset
+extern std::vector<spot_t> all_spots;
+extern pthread_mutex_t all_spots_mutex;
 
 // Buffers for communication with the FPGA
 extern int16_t *frame_buffer;

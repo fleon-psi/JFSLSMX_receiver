@@ -190,14 +190,6 @@ int close_gpu() {
 // (recursion will not fit well to GPU)
 // Constructing spot from strong pixels
 
-struct spot_t {
-    double x,y,z;
-    uint16_t module; // number of module - it is impossible for spot to belong to more than one module
-    uint64_t photons; // total photon count
-    uint64_t pixels; // number of pixels
-    uint64_t depth; // on how many frames the spot is present
-};
-
 // Adds two spot measurements
 void merge_spots(spot_t &spot1, const spot_t &spot2) {
     if (spot2.photons > 0) {
@@ -292,6 +284,8 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots) {
 void *run_gpu_thread(void *in_threadarg) {
     ThreadArg *arg = (ThreadArg *) in_threadarg;
 
+    std::vector<spot_t> spots;
+
     // Account for leftover
     size_t total_chunks = experiment_settings.nframes_to_write / NFRAMES_PER_STREAM;
     if (experiment_settings.nframes_to_write - total_chunks * NFRAMES_PER_STREAM > 0)
@@ -324,7 +318,6 @@ void *run_gpu_thread(void *in_threadarg) {
          pthread_mutex_unlock(writer_threads_done_mutex+ib_slice);
 
          // Here all writting is done, but it is guarranteed not be overwritten
-
 
          // Copy frames to GPU memory
          cudaError_t err;
@@ -370,8 +363,14 @@ void *run_gpu_thread(void *in_threadarg) {
              pthread_exit(0);
          }
          // Analyze results to find spots
+         analyze_spots(host_out, spots);
     }
     cudaEventDestroy (event_mem_copied);
+
+    pthread_mutex_lock(&all_spots_mutex);
+    for (int i = 0; i < spots.size(); i++)
+        all_spots.push_back(spots[i]);
+    pthread_mutex_unlock(&all_spots_mutex);
 
     std::cout << "GPU: Thread "<< arg->ThreadID << " done" << std::endl;
     pthread_exit(0);

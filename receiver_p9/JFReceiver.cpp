@@ -425,6 +425,9 @@ int main(int argc, char **argv) {
 
            // Reset status buffer
 	   memset(status_buffer, 0x0, status_buffer_size);
+
+           // Reset spot buffer
+           all_spots.clear();
         }
 
 #ifndef RECEIVE_FROM_FILE
