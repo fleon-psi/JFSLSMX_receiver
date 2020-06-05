@@ -380,6 +380,15 @@ void detector_state(const Pistache::Rest::Request& request, Pistache::Http::Resp
     response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));            
 }
 
+void fetch_preview(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
+    pthread_mutex_lock(&preview_jpeg_mutex);
+    update_jpeg_preview();
+    auto res = response.send(Pistache::Http::Code::Ok, (char *)preview_jpeg.data(), preview_jpeg.size(), MIME(Image,Jpeg));
+    res.then ([](ssize_t bytes) {pthread_mutex_unlock(&preview_jpeg_mutex);}, Pistache::Async::NoExcept);
+
+}
+
 void full_detector_state(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
     response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
     nlohmann::json j;
@@ -406,8 +415,9 @@ int main() {
     Pistache::Rest::Routes::Get(router, "/detector/api/" API_VERSION "/status/state", Pistache::Rest::Routes::bind(&detector_state));
     Pistache::Rest::Routes::Put(router, "/filewriter/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&filewriter_set));
     Pistache::Rest::Routes::Get(router, "/filewriter/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&filewriter_get));
+    Pistache::Rest::Routes::Get(router, "/preview", Pistache::Rest::Routes::bind(&fetch_preview));
     Pistache::Rest::Routes::Get(router, "/", Pistache::Rest::Routes::bind(&full_detector_state));
-
+    
     auto opts = Pistache::Http::Endpoint::options().threads(4);
     Pistache::Http::Endpoint server(addr);
     server.init(opts);

@@ -18,6 +18,7 @@
 #define JFWRITER_H_
 
 #include <ctime>
+#include <vector>
 #include <hdf5.h>
 
 #ifndef OFFLINE
@@ -32,6 +33,10 @@
 
 #define LZ4_BLOCK_SIZE  0
 #define ZSTD_BLOCK_SIZE (8*514*1030)
+
+#define PREVIEW_FREQUENCY 1.0
+#define PREVIEW_STRIDE (int(PREVIEW_FREQUENCY/experiment_settings.frame_time))
+#define PREVIEW_SIZE (XPIXEL * YPIXEL)
 
 enum compression_t {JF_COMPRESSION_NONE, JF_COMPRESSION_BSHUF_LZ4, JF_COMPRESSION_BSHUF_ZSTD};
 
@@ -97,6 +102,12 @@ extern pthread_mutex_t total_compressed_size_mutex;
 extern uint64_t remaining_frames[NCARDS];
 extern pthread_mutex_t remaining_frames_mutex[NCARDS];
 
+extern std::vector<int32_t> preview;
+//extern pthread_mutex_t preview_mutex; // not protected by mutex at the moment, but might be used in the future
+
+extern std::vector<unsigned char > preview_jpeg;
+extern pthread_mutex_t preview_jpeg_mutex;
+
 #ifndef OFFLINE
 extern sls::Detector *det;
 #endif
@@ -141,6 +152,7 @@ void mean_pedeG1(double out[NMODULES*NCARDS]);
 void mean_pedeG2(double out[NMODULES*NCARDS]);
 void count_bad_pixel(size_t out[NMODULES*NCARDS]);
 
+// ZeroMQ functions - not used at the moment
 int setup_zeromq_context();
 int close_zeromq_context();
 int setup_zeromq_sockets(void **socket);
@@ -149,4 +161,5 @@ int setup_zeromq_pull_socket(void **socket, int number);
 int close_zeromq_pull_socket(void **socket);
 int send_zeromq(void *zeromq_socket, void *data, size_t data_size, int frame, int chunk);
 
+int update_jpeg_preview();
 #endif // JFWRITER_H_

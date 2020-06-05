@@ -44,3 +44,9 @@ time_t time_pedestalG0 = 0;
 time_t time_pedestalG1 = 0;
 time_t time_pedestalG2 = 0;
 time_t time_datacollection = 0;
+
+std::vector<int32_t> preview(PREVIEW_SIZE);
+// pthread_mutex_t preview_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+std::vector<unsigned char > preview_jpeg;
+pthread_mutex_t preview_jpeg_mutex = PTHREAD_MUTEX_INITIALIZER;
