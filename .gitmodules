@@ -4,3 +4,6 @@
 [submodule "pistache"]
 	path = pistache
 	url = https://github.com/oktal/pistache
+[submodule "zstd"]
+	path = zstd
+	url = https://github.com/facebook/zstd
