@@ -48,14 +48,14 @@ CC=icc
 CFLAGS=-g -std=c99 -Ofast -g -static-intel -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info -fPIC
 CXXFLAGS= -std=c++14 -Ofast -g -static-intel -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info
 LDFLAGS= -Ofast -g -static-intel -xHost -ip -lm -lpthread -lz -libverbs -debug inline-debug-info -lssh $(IPPROOT)/lib/intel64/libippdc.a $(IPPROOT)/lib/intel64/libipps.a $(IPPROOT)/lib/intel64/libippcore.a
-CPPFLAGS= -I. -I../include -I${HDF5_PATH}/include -I$(PISTACHE_PATH)/include $(SLS_DETECTOR_INCLUDE) -I/usr/local/include/opencv4/
+CPPFLAGS= -I. -I../include -I../lz4 -I../zstd/lib -I${HDF5_PATH}/include -I$(PISTACHE_PATH)/include $(SLS_DETECTOR_INCLUDE) -I/usr/local/include/opencv4/
 
 WR_SRCS=Preview.o JFWriter.o NetIO.o FileIO.o WriterThread.o DetConfig.o sharedVariables.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o ../lz4/lz4.c
 
 all: RESTserver
 
 RESTserver: $(WR_SRCS) RESTserver.o
-	$(CXX) $(WR_SRCS) RESTserver.o -o RESTserver $(JF_LDLIBS) $(HDF5_LIBS) $(LDFLAGS) $(SLS_DETECTOR_LIB) $(PISTACHE_LIB) $(OPENCV_LIB) -lzstd
+	$(CXX) $(WR_SRCS) RESTserver.o -o RESTserver $(JF_LDLIBS) $(HDF5_LIBS) $(LDFLAGS) $(SLS_DETECTOR_LIB) $(PISTACHE_LIB) $(OPENCV_LIB) ../zstd/lib/libzstd.a
 
 clean:
 	rm -f *.o ../*.o ../bitshuffle/*.o JFWriter
