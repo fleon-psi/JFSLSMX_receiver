@@ -168,15 +168,16 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 				// Frame number counts from 0 (it is shifted by one vs. JUNGFRAU header info
 				// If Frame number is lower than first frame number it should be ignored
 				// As this is leftover from the previous measurement
-				if (header.jf_frame_number >= eth_settings.first_frame_number)
-					header.jf_frame_number -= eth_settings.first_frame_number;
+				if (header.jf_frame_number >= eth_settings.first_frame_number) {
+				    header.jf_frame_number -= eth_settings.first_frame_number;
 
-				// Quit if frame number reported is >= frame_number_to_quit
-				if (header.jf_frame_number >= eth_settings.frame_number_to_quit) packet_out.exit = 1;
-				else if (header.jf_frame_number < eth_settings.frame_number_to_stop) {
+				    // Quit if frame number reported is >= frame_number_to_quit
+				    if (header.jf_frame_number >= eth_settings.frame_number_to_quit) packet_out.exit = 1;
+				    else if (header.jf_frame_number < eth_settings.frame_number_to_stop) {
 					axis_packet = 0;
 					rcv_state = RCV_JF_HEADER;
-				}
+				    }
+                                }
 			}
 			break;
 		case RCV_JF_HEADER:
@@ -207,7 +208,6 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 							(delta > eth_settings.frames_per_trigger + DELAY_FRAMES_STOP_AND_QUIT)) {
 						// All expected triggers were observed + delay, so data collection can finish
 						packet_out.exit = 1;
-						std::cout << "exit" << std::endl;
 					} else if (packet_out.trigger && !trigger_set) {
 						// This is the first trigger that is encountered
 						trigger_set = 1;
@@ -246,7 +246,6 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 						// Trigger was not yet observed and this frame is without trigger, so it can be used to calculate G0
 						packet_out.pedestal = 1;
 					}
-					std::cout << "Pedestal " << packet_out.pedestal << " Save " << packet_out.save << " Frame number " << packet_out.frame_number << " Delta " << delta << " Last no trigger " << frame_number_last_no_trigger << std::endl;
 				}
 			}
 
