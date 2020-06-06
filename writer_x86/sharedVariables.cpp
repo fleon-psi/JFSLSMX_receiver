@@ -40,10 +40,11 @@ pthread_mutex_t remaining_frames_mutex[NCARDS];
 sls::Detector *det;
 #endif
 
-time_t time_pedestalG0 = 0;
-time_t time_pedestalG1 = 0;
-time_t time_pedestalG2 = 0;
-time_t time_datacollection = 0;
+struct timespec time_pedestalG0 = {0, 0};
+struct timespec time_pedestalG1 = {0, 0};
+struct timespec time_pedestalG2 = {0, 0};
+struct timespec time_start = {0, 0};
+struct timespec time_end = {0, 0};
 
 std::vector<int32_t> preview(PREVIEW_SIZE);
 // pthread_mutex_t preview_mutex = PTHREAD_MUTEX_INITIALIZER;

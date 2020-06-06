@@ -104,8 +104,10 @@ int jfwriter_arm() {
 #ifndef OFFLINE
         trigger_detector();
 #endif
+        clock_gettime(CLOCK_REALTIME, &time_start);
+
         if ((experiment_settings.pedestalG0_frames > 0) && (experiment_settings.conversion_mode == MODE_CONV))
-            time_pedestalG0 = time_datacollection;
+            time_pedestalG0 = time_start;
         return 0;
 }
 
@@ -122,6 +124,9 @@ int jfwriter_disarm() {
         // even if collection is still running
         if (writer_settings.write_hdf5 == true)
             close_data_hdf5();
+
+        // Record end time, as time when everything has ended
+        clock_gettime(CLOCK_REALTIME, &time_end);
 
         // Involves barrier after collecting data
 	for (int i = 0; i < NCARDS; i++)
@@ -169,7 +174,7 @@ int jfwriter_pedestalG0() {
 
     if (jfwriter_arm() == 1) return 1;
     if (jfwriter_disarm() == 1) return 1;
-    time_pedestalG0 = time_datacollection;    
+    time_pedestalG0 = time_start;    
 
     experiment_settings = tmp_settings;
     calc_mean_pedestal(gain_pedestal.pedeG0, mean_pedestalG0);
@@ -187,7 +192,7 @@ int jfwriter_pedestalG1() {
 
     if (jfwriter_arm() == 1) return 1;
     if (jfwriter_disarm() == 1) return 1;
-    time_pedestalG1 = time_datacollection;    
+    time_pedestalG1 = time_start;    
     
     experiment_settings = tmp_settings;
     calc_mean_pedestal(gain_pedestal.pedeG1, mean_pedestalG1);
@@ -206,7 +211,7 @@ int jfwriter_pedestalG2() {
     if (jfwriter_arm() == 1) return 1;
     if (jfwriter_disarm() == 1) return 1;
 
-    time_pedestalG2 = time_datacollection;
+    time_pedestalG2 = time_start;
     
     experiment_settings = tmp_settings;
     calc_mean_pedestal(gain_pedestal.pedeG2, mean_pedestalG2);

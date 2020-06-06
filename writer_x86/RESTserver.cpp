@@ -12,12 +12,14 @@
 #define API_VERSION "jf-0.1.0"
 #define KEV_OVER_ANGSTROM 12.398
 
-// This should be dynamically changed!
 #define FRAME_TIME_FULL_SPEED 0.0005
 #define COUNT_TIME_FULL_SPEED 0.00047
 
 #define FRAME_TIME_HALF_SPEED 0.001
 #define COUNT_TIME_HALF_SPEED 0.00097
+
+#define PISTACHE_THREADS 4
+#define PISTACHE_PORT 5232
 
 pthread_mutex_t daq_state_mutex = PTHREAD_MUTEX_INITIALIZER;
 enum daq_state_t {STATE_READY, STATE_ACQUIRE, STATE_ERROR, STATE_CHANGE, STATE_NOT_INITIALIZED} daq_state;
@@ -69,9 +71,9 @@ void full_status(nlohmann::json &j) {
 
     time_t now;
     time(&now);
-    j["pedestalG0_age"] = (uint64_t)(time - time_pedestalG0);
-    j["pedestalG1_age"] = (uint64_t)(time - time_pedestalG1);
-    j["pedestalG2_age"] = (uint64_t)(time - time_pedestalG2);
+    j["pedestalG0_age"] = (uint64_t)(time - time_pedestalG0.tv_sec);
+    j["pedestalG1_age"] = (uint64_t)(time - time_pedestalG1.tv_sec);
+    j["pedestalG2_age"] = (uint64_t)(time - time_pedestalG2.tv_sec);
     for (int i = 0; i < NCARDS * NMODULES; i++) {
         j["pedestalG0_mean_mod"+std::to_string(i)] = mean_pedestalG0[i];
         j["pedestalG1_mean_mod"+std::to_string(i)] = mean_pedestalG1[i];
@@ -114,7 +116,7 @@ void default_parameters() {
     experiment_settings.frame_time_detector = FRAME_TIME_HALF_SPEED;
     experiment_settings.count_time_detector = COUNT_TIME_HALF_SPEED;
     experiment_settings.summation = 1;
-    experiment_settings.frame_time = 0.001;
+    experiment_settings.frame_time = FRAME_TIME_HALF_SPEED;
     experiment_settings.nframes_to_write = 0;
     experiment_settings.ntrigger = 1;
     experiment_settings.energy_in_keV = 12.4;
@@ -150,6 +152,7 @@ void default_parameters() {
 void detector_command(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
     response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*"); // Necessary for Java Script
 
+    // State is locked, so one cannot run two PUT commands at the same time
     pthread_mutex_lock(&daq_state_mutex);
 
     auto command = request.param(":command").as<std::string>();
@@ -169,11 +172,11 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
             // If pedestal is old (or settings changed), need to update it
             //time_t now;
             //time(&now);
-            //if (((long)(time - time_pedestalG0) > PEDESTAL_TIME_CUTOFF) 
+            //if (((long)(time - time_pedestalG0.tv_sec) > PEDESTAL_TIME_CUTOFF) 
             //    && (experiment_settings.pedestalG0_frames == 0)) 
             //    jfwriter_pedestalG0();
-            //if (((long)(time - time_pedestalG1) > PEDESTAL_TIME_CUTOFF) 
-            //    || ((long)(time - time_pedestalG2) > PEDESTAL_TIME_CUTOFF)) {
+            //if (((long)(time - time_pedestalG1.tv_sec) > PEDESTAL_TIME_CUTOFF) 
+            //    || ((long)(time - time_pedestalG2.tv_sec) > PEDESTAL_TIME_CUTOFF)) {
             //    jfwriter_pedestalG1(); 
             //    jfwriter_pedestalG2();
             //}
@@ -238,11 +241,12 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
     }
 
     else if (variable == "speed") {
+        // Change of detector speed invalidates pedestal
         if (json_input["value"].get<std::string>() == "full") experiment_settings.jf_full_speed = true; 
         if (json_input["value"].get<std::string>() == "half") experiment_settings.jf_full_speed = false;
-        time_pedestalG0 = 0;
-        time_pedestalG1 = 0;
-        time_pedestalG2 = 0;
+        time_pedestalG0.tv_sec = 0;
+        time_pedestalG1.tv_sec = 0;
+        time_pedestalG2.tv_sec = 0;
     }
 
     else if (variable == "mode") {
@@ -254,11 +258,23 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
     }
 
     else if (variable == "frame_time") experiment_settings.frame_time = json_input["value"].get<float>();
-    else if (variable == "frame_time_detector") experiment_settings.frame_time_detector = json_input["value"].get<float>();
-    else if (variable == "count_time_detector") experiment_settings.count_time_detector = json_input["value"].get<float>();
-    else if (variable == "pedestalG0_frames") {experiment_settings.pedestalG0_frames = json_input["value"].get<int>(); time_pedestalG0 = 0;}
-    else if (variable == "pedestalG1_frames") {experiment_settings.pedestalG1_frames = json_input["value"].get<int>(); time_pedestalG1 = 0;}
-    else if (variable == "pedestalG2_frames") {experiment_settings.pedestalG2_frames = json_input["value"].get<int>(); time_pedestalG2 = 0;}
+
+    // Change of internal detector frame time invalidates pedestal for G0 (as this one is collected at actual frame rate)
+    else if (variable == "frame_time_detector") {
+        experiment_settings.frame_time_detector = json_input["value"].get<float>();
+        time_pedestalG0.tv_sec = 0;
+    } else if (variable == "count_time_detector") {
+    // Change of internal detector count time invalidates pedestal for all gains
+        experiment_settings.count_time_detector = json_input["value"].get<float>();
+        time_pedestalG0.tv_sec = 0;
+        time_pedestalG1.tv_sec = 0;
+        time_pedestalG2.tv_sec = 0;
+    }
+
+    // Change of number of frames invalidated pedestal
+    else if (variable == "pedestalG0_frames") {experiment_settings.pedestalG0_frames = json_input["value"].get<int>(); time_pedestalG0.tv_sec = 0;}
+    else if (variable == "pedestalG1_frames") {experiment_settings.pedestalG1_frames = json_input["value"].get<int>(); time_pedestalG1.tv_sec = 0;}
+    else if (variable == "pedestalG2_frames") {experiment_settings.pedestalG2_frames = json_input["value"].get<int>(); time_pedestalG2.tv_sec = 0;}
     else {
 	 response.send(Pistache::Http::Code::Not_Found, "Key " + variable + " doesn't exists");
          return;
@@ -319,6 +335,7 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
         if (experiment_settings.conversion_mode == MODE_PEDEG1) j["value"] = "pedestalG1";
         if (experiment_settings.conversion_mode == MODE_PEDEG2) j["value"] = "pedestalG2";
     } else if (variable == "pedestalG0") {
+         // Returns full pedestal array
          response.send(Pistache::Http::Code::Ok, (char *) gain_pedestal.pedeG0, NCARDS * NPIXEL * sizeof(uint16_t), MIME(Application, OctetStream)); 
          return; // Response is already sent, so don't send default response
     } else if (variable == "pedestalG1") {
@@ -396,6 +413,14 @@ void full_detector_state(const Pistache::Rest::Request& request, Pistache::Http:
     response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));
 }
 
+// This is required for PUT REST calls to be made from JavaScript in a web browser
+void allow(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
+    response.headers().add<Pistache::Http::Header::AccessControlAllowMethods>("PUT");
+    response.send(Pistache::Http::Code::No_Content);
+}
+
+
 int main() {
     daq_state = STATE_NOT_INITIALIZED;
 
@@ -405,20 +430,25 @@ int main() {
     
     std::cout << "Server running"<< std::endl;
 
-    Pistache::Address addr(Pistache::Ipv4::any(), Pistache::Port(5232));
+    Pistache::Address addr(Pistache::Ipv4::any(), Pistache::Port(PISTACHE_PORT));
 
     Pistache::Rest::Router router;
     Pistache::Rest::Routes::Put(router, "/detector/api/" API_VERSION "/command/:command", Pistache::Rest::Routes::bind(&detector_command));
-    Pistache::Rest::Routes::Get(router, "/detector/api/" API_VERSION "/command/:command", Pistache::Rest::Routes::bind(&detector_command));
+    Pistache::Rest::Routes::Options(router, "/detector/api/" API_VERSION "/command/:command", Pistache::Rest::Routes::bind(&allow));
+
     Pistache::Rest::Routes::Put(router, "/detector/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&detector_set));
+    Pistache::Rest::Routes::Options(router, "/detector/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&allow));
     Pistache::Rest::Routes::Get(router, "/detector/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&detector_get));
     Pistache::Rest::Routes::Get(router, "/detector/api/" API_VERSION "/status/state", Pistache::Rest::Routes::bind(&detector_state));
+
     Pistache::Rest::Routes::Put(router, "/filewriter/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&filewriter_set));
+    Pistache::Rest::Routes::Options(router, "/filewriter/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&allow));
     Pistache::Rest::Routes::Get(router, "/filewriter/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&filewriter_get));
+
     Pistache::Rest::Routes::Get(router, "/preview", Pistache::Rest::Routes::bind(&fetch_preview));
     Pistache::Rest::Routes::Get(router, "/", Pistache::Rest::Routes::bind(&full_detector_state));
     
-    auto opts = Pistache::Http::Endpoint::options().threads(4);
+    auto opts = Pistache::Http::Endpoint::options().threads(PISTACHE_THREADS);
     Pistache::Http::Endpoint server(addr);
     server.init(opts);
     server.setHandler(router.handler());

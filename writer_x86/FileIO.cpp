@@ -14,8 +14,10 @@
 #define PIXEL_SIZE_IN_UM        75.0
 #define PIXEL_SIZE_IN_MM       (PIXEL_SIZE_IN_UM/1000.0)
 #define DETECTOR_NAME          "JF4M"
-#define SOURCE_NAME            "SLS"
+#define SOURCE_NAME_SHORT      "SLS"
+#define SOURCE_NAME            "Swiss Light Source"
 #define INSTRUMENT_NAME        "X06DA"
+#define INSTRUMENT_NAME_SHORT  "PXIII"
 
 #define HDF5_ERROR(ret,func) if (ret) printf("%s(%d) %s: err = %d\n",__FILE__,__LINE__, #func, ret), exit(ret)
 
@@ -289,7 +291,7 @@ int saveInt1D(hid_t location, std::string name, const int *val, std::string unit
     return 0;
 }
 
-int saveString(hid_t location, std::string name, std::string val, std::string units = "") {
+int saveString(hid_t location, std::string name, std::string val, std::string units = "", std::string short_name = "") {
     herr_t status;
     
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
@@ -310,6 +312,7 @@ int saveString(hid_t location, std::string name, std::string val, std::string un
     status = H5Dwrite(dataset_id, atype, H5S_ALL, H5S_ALL, H5P_DEFAULT,
                       val.c_str());
     if (units != "") addStringAttribute(dataset_id, "units", units);
+    if (short_name != "") addStringAttribute(dataset_id, "short_name", units);
     
     /* End access to the dataset and release resources used by it. */
     status = H5Dclose(dataset_id);
@@ -319,11 +322,24 @@ int saveString(hid_t location, std::string name, std::string val, std::string un
     return 0;
 }
 
-int saveTimeUTC(hid_t location, std::string name, time_t time) {
+std::string time_UTC(time_t time, long nsec = 0) {
     char buf[255];
     strftime(buf, sizeof(buf), "%FT%TZ", gmtime(&time));
-    return saveString(location, name, std::string(buf));
+    return std::string(buf);
 }
+
+std::string hdf5_version() {
+    unsigned majnum;
+    unsigned minnum;
+    unsigned relnum;
+    H5get_libversion(&majnum, &minnum, &relnum);
+    return "hdf5-" + std::to_string(majnum) + "." + std::to_string(minnum) + "." + std::to_string(relnum);
+}
+
+//int saveTimeUTC(hid_t location, std::string name, time_t time) {
+//    return saveString(location, name, std::string(buf));
+//}
+
 
 int saveDouble(hid_t location, std::string name, double val, std::string units = "") {
     double tmp = val;
@@ -499,8 +515,12 @@ int open_master_hdf5() {
 		std::cerr << "Cannot create file: " << filename << std::endl;
 		return 1;
 	}
-
-//        H5Fstart_swmr_write(master_file_id);
+        
+        time_t now;
+        time(&now);
+        addStringAttribute(master_file_id, "HDF5_Version", hdf5_version());
+        addStringAttribute(master_file_id, "file_name", filename.c_str());
+        addStringAttribute(master_file_id, "file_time", time_UTC(now));
 
 	hid_t grp = createGroup(master_file_id, "/entry", "NXentry");
         saveString(grp,"definition", "NXmx");
@@ -519,11 +539,11 @@ int open_master_hdf5() {
 	H5Gclose(grp);
 
 	grp = createGroup(master_file_id, "/entry/source","NXsource");
-        saveString(grp, "name", SOURCE_NAME);        
+        saveString(grp, "name", SOURCE_NAME, "", SOURCE_NAME_SHORT);        
 	H5Gclose(grp);
 
 	grp = createGroup(master_file_id, "/entry/instrument","NXinstrument");
-        saveString(grp, "name", INSTRUMENT_NAME);        
+        saveString(grp, "name", INSTRUMENT_NAME, "", INSTRUMENT_NAME_SHORT);        
 	H5Gclose(grp);
 
 	grp = createGroup(master_file_id, "/entry/instrument/filter", "NXattenuator");
@@ -592,8 +612,8 @@ int open_master_hdf5() {
 	saveInt(grp, "nimages",    experiment_settings.nframes_to_write_per_trigger);
 	saveInt(grp, "ntrigger",   experiment_settings.ntrigger);
         saveInt(grp, "internal_summation", experiment_settings.summation);
-        saveDouble(grp, "internal_frame_time", experiment_settings.frame_time_detector, "s");
-        saveDouble(grp, "internal_count_time", experiment_settings.count_time_detector, "s");
+        saveDouble(grp, "frame_time_detector", experiment_settings.frame_time_detector, "s");
+        saveDouble(grp, "count_time_detector", experiment_settings.count_time_detector, "s");
         saveInt(grp, "nimages_per_data_file" , writer_settings.images_per_file);
 	saveInt(grp, "x_pixels_in_detector", XPIXEL);
 	saveInt(grp, "y_pixels_in_detector", YPIXEL);
@@ -618,16 +638,17 @@ int open_master_hdf5() {
 
 int close_master_hdf5() {
     hid_t entry_grp = H5Gopen2(master_file_id, "/entry", H5P_DEFAULT);
-    saveTimeUTC(entry_grp, "start_time", time_datacollection);
-    saveTimeUTC(entry_grp, "end_time_esimated", time_datacollection + (time_t) (experiment_settings.nframes_to_collect * experiment_settings.frame_time));
+    saveString(entry_grp, "start_time", time_UTC(time_start.tv_sec, time_start.tv_nsec));
+    saveString(entry_grp, "end_time_estimated", time_UTC(time_start.tv_sec + (time_t) (experiment_settings.nframes_to_collect * experiment_settings.frame_time)));
+    saveString(entry_grp, "end_time_estimated", time_UTC(time_end.tv_sec, time_end.tv_nsec));
     H5Gclose(entry_grp);
 
     hid_t det_grp = H5Gopen2(master_file_id,  "/entry/instrument/detector", H5P_DEFAULT );
     hid_t grp = H5Gopen2(master_file_id,  "/entry/instrument/detector/detectorSpecific", H5P_DEFAULT );
 
-    saveTimeUTC(grp, "pedestal_G0_time", time_pedestalG0);
-    saveTimeUTC(grp, "pedestal_G1_time", time_pedestalG1);
-    saveTimeUTC(grp, "pedestal_G2_time", time_pedestalG2);
+    saveString(grp, "pedestal_G0_time", time_UTC(time_pedestalG0.tv_sec));
+    saveString(grp, "pedestal_G1_time", time_UTC(time_pedestalG1.tv_sec));
+    saveString(grp, "pedestal_G2_time", time_UTC(time_pedestalG2.tv_sec));
 
     H5Gclose(grp);
     H5Gclose(det_grp);
@@ -678,18 +699,17 @@ int open_data_hdf5() {
                         writer_settings.HDF5_prefix + "_" + std::string(buff)+".h5";
         else filename = writer_settings.HDF5_prefix + "_" + std::string(buff)+".h5";
 
+        // Need to ensure that only newest library can write into this file
         data_hdf5_fapl[i] = H5Pcreate(H5P_FILE_ACCESS);
         H5Pset_libver_bounds(data_hdf5_fapl[i], H5F_LIBVER_LATEST, H5F_LIBVER_LATEST);
 
-	// Create data file
+	// Create data file with SWMR flag
 	data_hdf5[i] = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC|H5F_ACC_SWMR_WRITE, H5P_DEFAULT, data_hdf5_fapl[i]);
 	if (data_hdf5[i] < 0) {
 		std::cerr << "Cannot create file: " << filename << std::endl;
 		return 1;
 	}
 
-//        H5Fstart_swmr_write(data_hdf5[i]);
- 
 	hid_t grp = createGroup(data_hdf5[i], "/entry", "NXentry");
 	H5Gclose(grp);
 
@@ -700,16 +720,24 @@ int open_data_hdf5() {
 	// https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
 	hsize_t dims[3], chunk[3];
 
-	dims[0] = frames;
-	dims[1] = 514 * NMODULES / 2 * NCARDS;
-	dims[2] = 1030*2;
+        if (experiment_settings.conversion_mode == MODE_CONV) {
+	    dims[0] = frames;
+	    dims[1] = 514 * NMODULES / 2 * NCARDS;
+	    dims[2] = 1030*2;
 
-	chunk[0] = 1;
-        if (writer_settings.write_hdf5 == true)
+	    chunk[0] = 1;
 	    chunk[1] = 514 * NMODULES / 2;
-        else
-	    chunk[1] = 514 * NMODULES / 2 * NCARDS;
-	chunk[2] = 1030*2;
+	    chunk[2] = 1030*2;
+        } else {
+	    dims[0] = frames;
+	    dims[1] = 512 * NMODULES * NCARDS;
+	    dims[2] = 1024;
+
+	    chunk[0] = 1;
+	    chunk[1] = 512 * NMODULES;
+	    chunk[2] = 1024;
+
+        }
 
 	// Create the data space for the dataset.
 	data_hdf5_dataspace[i] = H5Screate_simple(3, dims, NULL);
@@ -742,7 +770,7 @@ int open_data_hdf5() {
 	    data_hdf5_dataset[i] = H5Dcreate2(data_hdf5_group[i], "data", H5T_STD_I32LE, data_hdf5_dataspace[i],
 			H5P_DEFAULT, data_hdf5_dcpl[i], H5P_DEFAULT);
 
-	// Add attributes
+	// Add attributes of low and high frame number
 	int tmp = i *  writer_settings.images_per_file + 1;
 	hid_t aid = H5Screate(H5S_SCALAR);
 	hid_t attr = H5Acreate2(data_hdf5_dataset[i], "image_nr_low", H5T_STD_I32LE, aid, H5P_DEFAULT, H5P_DEFAULT);
@@ -789,11 +817,20 @@ int close_data_hdf5() {
 int save_data_hdf(char *data, size_t size, size_t frame, int chunk) {
     int file = frame / writer_settings.images_per_file;
     pthread_mutex_lock(&hdf5_mutex);
+
     // TODO: Ugly workaround - need to figure out, why chunks are wrong
     size_t chunk0;
     if (chunk == 1) chunk0 = 0;
     else chunk0 = 1;
-    hsize_t offset[] = {frame % writer_settings.images_per_file, chunk0 * 514 * NMODULES / 2, 0};
+
+    hsize_t offset[3];
+    offset[0] = frame % writer_settings.images_per_file;
+    if (experiment_settings.conversion_mode == MODE_CONV) {
+        offset[1] = chunk0 * 514 * NMODULES / 2;
+    } else {
+        offset[1] = chunk0 * 512 * NMODULES;
+    }
+    offset[2] = 0;
     herr_t h5ret = H5Dwrite_chunk(data_hdf5_dataset[file], H5P_DEFAULT, 0, offset, size, data);
     HDF5_ERROR(h5ret,H5Dwrite_chunk);
     H5Dflush(data_hdf5_dataset[file]);

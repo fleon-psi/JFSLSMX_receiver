@@ -112,10 +112,11 @@ extern pthread_mutex_t preview_jpeg_mutex;
 extern sls::Detector *det;
 #endif
 
-extern time_t time_pedestalG0;
-extern time_t time_pedestalG1;
-extern time_t time_pedestalG2;
-extern time_t time_datacollection;
+extern struct timespec time_pedestalG0;
+extern struct timespec time_pedestalG1;
+extern struct timespec time_pedestalG2;
+extern struct timespec time_start;
+extern struct timespec time_end;
 
 extern double mean_pedestalG0[NMODULES*NCARDS];
 extern double mean_pedestalG1[NMODULES*NCARDS];

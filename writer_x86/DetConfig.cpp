@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#include "JFWriter.h"
 
+#include <cmath>
 #include <libssh/libssh.h>
-
 #include <Detector.h>
+#include "JFWriter.h"
 
 int trigger_omega() {
 	ssh_session my_ssh_session;	
@@ -100,18 +100,13 @@ int setup_detector() {
             return 1;
         }
 
-        std::chrono::microseconds frame_time;
-        std::chrono::microseconds exp_time;
+        std::chrono::microseconds frame_time = std::chrono::microseconds(std::lround(experiment_settings.frame_time_detector*1e6));
+        std::chrono::microseconds exp_time = std::chrono::microseconds(std::lround(experiment_settings.count_time_detector*1e6));
 
-        if (experiment_settings.jf_full_speed) {
+        if (experiment_settings.jf_full_speed)
             det->setSpeed(slsDetectorDefs::speedLevel::FULL_SPEED);
-            frame_time = std::chrono::microseconds(500);
-            exp_time = std::chrono::microseconds(470);
-        } else {
+        else
             det->setSpeed(slsDetectorDefs::speedLevel::HALF_SPEED);
-            frame_time = std::chrono::microseconds(1000);
-            exp_time = std::chrono::microseconds(970);
-        }
         
         if (experiment_settings.conversion_mode == MODE_PEDEG1) {
             frame_time = std::chrono::milliseconds(10); // 100 Hz
@@ -137,7 +132,6 @@ int setup_detector() {
 
 int trigger_detector() {
 #ifndef OFFLINE
-        time(&time_datacollection);
         if (writer_settings.timing_trigger) {
             det->startDetector();
             // sleep 200 ms is necessary for SNAP setup
