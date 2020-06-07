@@ -42,6 +42,7 @@ struct experiment_settings_t {
         double   detector_distance;     // in mm
         double   transmission;          // 1.0 = full transmission
         double   total_flux;           // in e/s
+        double   omega_start;           // in degrees
         double   omega_angle_per_image; // in degrees
         double   beam_size_x;           // in micron
         double   beam_size_y;           // in micron
