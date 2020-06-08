@@ -17,8 +17,40 @@
 
 #include <cmath>
 #include <libssh/libssh.h>
+#include <pistache/client.h>
+#include <pistache/http.h>
 #include <Detector.h>
 #include "JFWriter.h"
+
+int trigger_rpi() {
+    int retval = 0;
+
+    Pistache::Http::Client client;
+
+    auto opts = Pistache::Http::Client::options().threads(1).maxConnectionsPerHost(8);
+    client.init(opts);
+
+    std::vector<Pistache::Async::Promise<Pistache::Http::Response>> responses;
+
+    auto resp = client.get("http://mx-jungfrau-rpi-1:5000/trigger").send();
+    resp.then(
+	[&](Pistache::Http::Response response) {
+           retval = 0;
+         },
+	[&](std::exception_ptr exc) {
+           std::cerr << "Cannot trigger RPi" << std::endl;
+           retval = 1;
+        });
+    responses.push_back(std::move(resp));
+
+    auto sync = Pistache::Async::whenAll(responses.begin(), responses.end());
+    Pistache::Async::Barrier<std::vector<Pistache::Http::Response>> barrier(sync);
+    barrier.wait_for(std::chrono::seconds(5));
+
+    client.shutdown();
+    return retval;
+}
+
 
 int trigger_omega() {
 	ssh_session my_ssh_session;	
@@ -137,7 +169,7 @@ int trigger_detector() {
             // sleep 200 ms is necessary for SNAP setup
             // TODO: Likely 20-50 us would be enough
             usleep(200000);
-            trigger_omega();
+            trigger_rpi();
         } else {
             usleep(200000);
             det->startDetector();
@@ -159,19 +191,23 @@ bool detector_power_status() {
 }
 
 int powerup_detector() {
+#ifndef OFFLINE
     det->setPowerChip(1);
     sleep(5);
     det->setHighVoltage(0);
     sleep(5);
+#endif
     return 0;
 }
 
 int shutdown_detector() {
+#ifndef OFFLINE
    det->stopDetector();
    det->setHighVoltage(0);
    sleep(5);
    det->setPowerChip(0);
    sleep(5);
+#endif
    return 0;
 }
 
