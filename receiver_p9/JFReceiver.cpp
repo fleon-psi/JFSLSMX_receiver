@@ -325,11 +325,14 @@ int main(int argc, char **argv) {
 
            memset(ib_buffer_occupancy, 0, RDMA_SQ_SIZE * sizeof(uint16_t));
 
+	   for (int i = 0; i < NMODULES; i++)
+               online_statistics->head[i] = 0;
+
            // TODO: Load gain before, only multiply by energy here
            // TODO: Multi-pixels divided by two/four in gain calculation
 	   // Load gain files (double, per module)
 	   for (int i = 0; i < NMODULES; i++)
-		load_gain(receiver_settings.gain_file_name[i], i, experiment_settings.energy_in_keV);
+	       load_gain(receiver_settings.gain_file_name[i], i, experiment_settings.energy_in_keV);
 
            // Barrier #1
            TCP_exchange_magic_number();
