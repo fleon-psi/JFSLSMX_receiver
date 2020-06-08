@@ -1,5 +1,6 @@
 #include <pistache/endpoint.h>
 #include <pistache/router.h>
+#include <pistache/client.h>
 #include <iostream>
 #include <map>
 #include <cmath>
@@ -16,7 +17,7 @@
 #define COUNT_TIME_FULL_SPEED 0.00047
 
 #define FRAME_TIME_HALF_SPEED 0.001
-#define COUNT_TIME_HALF_SPEED 0.00097
+#define COUNT_TIME_HALF_SPEED 0.00001
 
 #define PISTACHE_THREADS 4
 #define PISTACHE_PORT 5232
@@ -86,10 +87,10 @@ void full_status(nlohmann::json &j) {
 void update_summation() {
     if (experiment_settings.jf_full_speed) {
         if (experiment_settings.frame_time_detector < FRAME_TIME_FULL_SPEED) experiment_settings.frame_time_detector = FRAME_TIME_FULL_SPEED;
-        if (experiment_settings.count_time_detector < COUNT_TIME_FULL_SPEED) experiment_settings.count_time_detector = COUNT_TIME_FULL_SPEED;
+//        if (experiment_settings.count_time_detector < COUNT_TIME_FULL_SPEED) experiment_settings.count_time_detector = COUNT_TIME_FULL_SPEED;
     } else {
         if (experiment_settings.frame_time_detector < FRAME_TIME_HALF_SPEED) experiment_settings.frame_time_detector = FRAME_TIME_HALF_SPEED;
-        if (experiment_settings.count_time_detector < COUNT_TIME_HALF_SPEED) experiment_settings.count_time_detector = COUNT_TIME_HALF_SPEED;
+//        if (experiment_settings.count_time_detector < COUNT_TIME_HALF_SPEED) experiment_settings.count_time_detector = COUNT_TIME_HALF_SPEED;
     }
     
     experiment_settings.summation = std::lround(experiment_settings.frame_time / experiment_settings.frame_time_detector);
@@ -118,7 +119,7 @@ void default_parameters() {
     experiment_settings.summation = 1;
     experiment_settings.frame_time = FRAME_TIME_HALF_SPEED;
     experiment_settings.nframes_to_write = 0;
-    experiment_settings.ntrigger = 1;
+    experiment_settings.ntrigger = 0;
     experiment_settings.energy_in_keV = 12.4;
     experiment_settings.pedestalG0_frames = 2000;
     experiment_settings.pedestalG1_frames = 1000;
@@ -226,6 +227,7 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
     else if (variable == "beam_center_x") experiment_settings.beam_x = json_input["value"].get<float>();
     else if (variable == "beam_center_y") experiment_settings.beam_y = json_input["value"].get<float>();
     else if (variable == "detector_distance") experiment_settings.detector_distance = json_input["value"].get<float>();
+    else if (variable == "omega_start") experiment_settings.omega_start = json_input["value"].get<float>();
     else if (variable == "omega_increment") experiment_settings.omega_angle_per_image = json_input["value"].get<float>();
     else if (variable == "total_flux") experiment_settings.total_flux = json_input["value"].get<float>();
     else if (variable == "beam_size_x") experiment_settings.beam_size_x = json_input["value"].get<float>();
@@ -304,9 +306,10 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
     else if (variable == "detector_distance") {j["value"] = experiment_settings.detector_distance; j["value_type"] = "float"; j["unit"] = "mm";}
     else if (variable == "beam_size_x") {j["value"] = experiment_settings.beam_size_x; j["value_type"] = "float"; j["unit"] = "um";}
     else if (variable == "beam_size_y") {j["value"] = experiment_settings.beam_size_y; j["value_type"] = "float"; j["unit"] = "um";}
+    else if (variable == "omega_start") {j["value"] = experiment_settings.omega_start; j["value_type"] = "float"; j["unit"] = "degree";}
+    else if (variable == "omega_increment") {j["value"] = experiment_settings.omega_angle_per_image; j["value_type"] = "float"; j["unit"] = "degree";}
     else if (variable == "total_flux") {j["value"] = experiment_settings.total_flux; j["value_type"] = "float"; j["unit"] = "1/s";}
     else if (variable == "transmission") {j["value"] = experiment_settings.transmission; j["value_type"] = "float";}
-
 
     else if (variable == "x_pixels_in_detector") {j["value"] = XPIXEL; j["value_type"] = "uint";}
     else if (variable == "y_pixels_in_detector") {j["value"] = YPIXEL; j["value_type"] = "uint";}
@@ -428,8 +431,6 @@ int main() {
 
     jfwriter_setup();
     
-    std::cout << "Server running"<< std::endl;
-
     Pistache::Address addr(Pistache::Ipv4::any(), Pistache::Port(PISTACHE_PORT));
 
     Pistache::Rest::Router router;
@@ -451,6 +452,7 @@ int main() {
     auto opts = Pistache::Http::Endpoint::options().threads(PISTACHE_THREADS);
     Pistache::Http::Endpoint server(addr);
     server.init(opts);
+
     server.setHandler(router.handler());
     server.serve();
 }
