@@ -50,6 +50,7 @@ struct experiment_settings_t {
         double   shutter_delay;  // in seconds delay between trigger and shutter
 
         double   strong_pixel_value;
+        double sample_temperature; // in K
 };
 
 struct receiver_output_t {
