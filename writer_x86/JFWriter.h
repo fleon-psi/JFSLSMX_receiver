@@ -38,6 +38,8 @@
 #define PREVIEW_STRIDE (int(PREVIEW_FREQUENCY/experiment_settings.frame_time))
 #define PREVIEW_SIZE (XPIXEL * YPIXEL)
 
+#define PEDESTAL_TIME_CUTOFF (60*60) // collect pedestal every 1 hour
+
 enum compression_t {JF_COMPRESSION_NONE, JF_COMPRESSION_BSHUF_LZ4, JF_COMPRESSION_BSHUF_ZSTD};
 
 // Settings only necessary for writer
@@ -105,9 +107,6 @@ extern pthread_mutex_t remaining_frames_mutex[NCARDS];
 extern std::vector<int32_t> preview;
 //extern pthread_mutex_t preview_mutex; // not protected by mutex at the moment, but might be used in the future
 
-extern std::vector<unsigned char > preview_jpeg;
-extern pthread_mutex_t preview_jpeg_mutex;
-
 #ifndef OFFLINE
 extern sls::Detector *det;
 #endif
@@ -162,5 +161,7 @@ int setup_zeromq_pull_socket(void **socket, int number);
 int close_zeromq_pull_socket(void **socket);
 int send_zeromq(void *zeromq_socket, void *data, size_t data_size, int frame, int chunk);
 
-int update_jpeg_preview();
+int update_jpeg_preview(std::vector<uint8_t> &jpeg_out, float contrast = 50.0);
+int update_jpeg_preview_log(std::vector<uint8_t> &jpeg_out, float contrast = 50.0);
+ 
 #endif // JFWRITER_H_
