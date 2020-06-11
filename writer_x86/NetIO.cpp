@@ -35,7 +35,6 @@ int exchange_magic_number(int sockfd) {
 		std::cerr << "Mismatch in TCP/IP communication" << std::endl;                
 		return 1;
 	}
-	std::cout << "Magic number OK" << std::endl;
 	return 0;
 }
 
@@ -162,7 +161,6 @@ int connect_to_power9(int card_id) {
 	// Switch to ready to receive
 	switch_to_rtr(writer_connection_settings[card_id].ib_settings,
 			remote.rq_psn, remote.dlid, remote.qp_num);
-	std::cout << "IB Ready to receive" << std::endl;
 
 	return 0;
 }
