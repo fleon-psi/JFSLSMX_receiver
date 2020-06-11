@@ -98,7 +98,7 @@ int switch_to_init(ib_settings_t &settings) {
         ret = ibv_query_port(settings.context, 1, &settings.port_attr);
  	if (ret != 0)
         {
-             std::cout << "Cannot query port" << std::endl;
+             std::cerr << "Cannot query port" << std::endl;
              return 1;
         }
         return 0;
@@ -145,9 +145,6 @@ int switch_to_rtr(ib_settings_t &settings, uint32_t rq_psn, uint16_t dlid, uint3
 	qp_attr.ah_attr.dlid       = dlid;
         qp_attr.ah_attr.port_num   = 1;
 	int ret = ibv_modify_qp(settings.qp, &qp_attr, qp_flags);
-
-	std::cerr << "PSN: " << rq_psn << " Dest DLID: " << dlid << " Dest QP: " << dest_qp_num << std::endl;
-	std::cerr << "PSN: " << rq_psn << " Own  DLID: " << settings.port_attr.lid << " Own  QP: " << settings.qp->qp_num << std::endl;
 
 	if (ret) {
 		std::cerr << "Failed to set IB queue pair to ready to receive " << ret << std::endl;
