@@ -12,6 +12,7 @@ import TableContainer from '@material-ui/core/TableContainer';
 import TableRow from '@material-ui/core/TableRow';
 import Paper from '@material-ui/core/Paper';
 import Switch from '@material-ui/core/Switch';
+import Slider from '@material-ui/core/Slider';
 
 function formatTime(val) {
     var x = Number(val);
@@ -27,7 +28,8 @@ function formatPedestal(val) {
 class App extends Component {
   state = {
      value: {state: "Not connected"},
-     expertMode: false
+     expertMode: false,
+     contrast: 10.0
   }
 
   updateREST() {
@@ -37,11 +39,12 @@ class App extends Component {
     .catch(error => {
         this.setState({value: {state: "Not connected"}})
      });
+     this.setState({contrast : this.state.contrast + 1});
   }
   
   componentDidMount() { 
     this.updateREST();
-    this.interval = setInterval(() => this.updateREST(), 5000);
+    this.interval = setInterval(() => this.updateREST(), 1000);
   }
 
   componentWillUnmount() {
@@ -52,6 +55,9 @@ class App extends Component {
      fetch('http://' + window.location.hostname + ':5232/detector/api/jf-0.1.0/command/initialize',{method : "PUT"});
   }
 
+  sliderMoved = (event, newValue) => {
+    this.setState({contrast: newValue});
+  };
 
   handleChange = (event) => {
     this.setState({[event.target.name]: event.target.checked });
@@ -74,29 +80,28 @@ class App extends Component {
        <Button color="secondary" onClick={this.reinitialize} variant="contained" disableElevation>Initialize</Button>
        </Toolbar>
        </AppBar>
-     <br/>
-     <Typography variant="h6">
+     <br/><br/>
 
-     </Typography><br/>
-     <TableContainer component={Paper} style={{width: 650, marginLeft: "auto", marginRight: "auto"}}>
+     {this.state.expertMode?
+     <div><TableContainer component={Paper} style={{width: 650, marginLeft: "auto", marginRight: "auto"}}>
       <Table size="small"  aria-label="simple table">
           <TableBody>
             <TableRow>
               <TableCell component="th" scope="row"> Frame time </TableCell>
               <TableCell align="right">{formatTime(this.state.value.frame_time)}</TableCell>
             </TableRow>
-            {this.state.expertMode?<TableRow>
+            <TableRow>
               <TableCell component="th" scope="row"> Frame time (internal)</TableCell>
               <TableCell align="right">{formatTime(this.state.value.frame_time_detector)}</TableCell>
-            </TableRow>:""}
+            </TableRow>
             <TableRow>
               <TableCell component="th" scope="row"> Count time </TableCell>
               <TableCell align="right">{formatTime(this.state.value.count_time)}</TableCell>
             </TableRow>
-            {this.state.expertMode?<TableRow>
+            <TableRow>
               <TableCell component="th" scope="row"> Count time (internal)</TableCell>
               <TableCell align="right">{formatTime(this.state.value.count_time_detector)}</TableCell>
-            </TableRow>:""}
+            </TableRow>
             <TableRow>
               <TableCell component="th" scope="row"> Frame summation </TableCell>
               <TableCell align="right">{this.state.value.summation}</TableCell>
@@ -181,8 +186,11 @@ class App extends Component {
               Mean pedestal G2: {formatPedestal(this.state.value.pedestalG2_mean_mod1)}
           </Paper>
      </Grid>
-     </Grid><br/>
-    <iframe title="grafana" src="http://mx-jungfrau-1:3000/d-solo/npmZQ7kMk/servers?orgId=1&theme=light&panelId=12" width="100%" height="250" frameborder="0"/>
+     </Grid><br/><br/>
+     <iframe title="grafana" src="http://mx-jungfrau-1:3000/d-solo/npmZQ7kMk/servers?orgId=1&theme=light&panelId=12" width="100%" height="250" frameBorder="0"/>
+     </div>
+    :<div> <Grid container spacing={2}><Grid item xs={12}> <img src={"http://mx-jungfrau-1:5232/preview/" + this.state.contrast}/></Grid></Grid> <Slider defaultValue={10.0} min={1.0} max={200} onChange={this.sliderMoved}></Slider></div>}
+    <br/>
 
      </div>
   }
