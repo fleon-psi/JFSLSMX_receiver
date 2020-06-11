@@ -161,12 +161,6 @@ int read_frame(int frame_number, int32_t *output) {
         if (cache_nbytes == 2)
             filter16(output);
 
-
-        std::cout << output[847*1030*2+701] << std::endl;            
-        std::cout << output[848*1030*2+701] << std::endl;            
-        std::cout << output[847*1030*2+702] << std::endl;            
-        std::cout << output[848*1030*2+702] << std::endl;            
-
         pthread_mutex_lock(&hdf5_mutex);
         H5Sclose(memspace_id);
 
@@ -217,16 +211,15 @@ int read_frame(int frame_number, int32_t *output) {
             size_t block_size = bshuf_read_uint32_BE(raw_chunk+8);
 
             if (decompressed_size != cache_nx*cache_ny*cache_nbytes/y_ratio) return 1;
-            std::cout << decompressed_size << " " << i * cache_nx*cache_ny/y_ratio << " " << block_size << " " << raw_size << std::endl;
 
             if (cd_values[4] == BSHUF_H5_COMPRESS_ZSTD) {
                 if (cache_nbytes == 2)
-                   std::cout << bshuf_decompress_zstd(raw_chunk+12, decompressed_16 + i * cache_nx*cache_ny/y_ratio, cache_nx*cache_ny/y_ratio, 2, block_size) << std::endl;
+                   bshuf_decompress_zstd(raw_chunk+12, decompressed_16 + i * cache_nx*cache_ny/y_ratio, cache_nx*cache_ny/y_ratio, 2, block_size);
                 else
                    bshuf_decompress_zstd(raw_chunk+12, output + i * cache_nx*cache_ny/y_ratio, cache_nx*cache_ny/y_ratio, 4, block_size);
             } else if (cd_values[4] == BSHUF_H5_COMPRESS_LZ4) {
                 if (cache_nbytes == 2)
-                   std::cout << bshuf_decompress_lz4(raw_chunk+12, decompressed_16 + i * cache_nx*cache_ny/y_ratio, cache_nx*cache_ny/y_ratio, 2, block_size) << std::endl;
+                   bshuf_decompress_lz4(raw_chunk+12, decompressed_16 + i * cache_nx*cache_ny/y_ratio, cache_nx*cache_ny/y_ratio, 2, block_size);
                 else
                    bshuf_decompress_lz4(raw_chunk+12, output + i * cache_nx*cache_ny/y_ratio, cache_nx*cache_ny/y_ratio, 4, block_size);
             }
@@ -284,7 +277,6 @@ void plugin_open(const char * filename,
         cache_nframes_per_files = readInt("/entry/instrument/detector/detectorSpecific/nimages_per_data_file");
         mask = (uint32_t *) malloc(cache_nx*cache_ny*sizeof(uint32_t));
         if (readMask("/entry/instrument/detector/pixel_mask") == 1) *error_flag = -4;
-        std::cout << "File " << filename << " NX=" << cache_nx << " NY=" << cache_ny << " NBYTES=" << cache_nbytes << " IMAGES=" << cache_nframes << std::endl;
     }
 }
 
