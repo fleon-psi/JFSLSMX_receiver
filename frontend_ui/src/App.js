@@ -1,41 +1,86 @@
 import React, {Component} from 'react';
 
-import AppBar from '@material-ui/core/AppBar';
-import Grid from '@material-ui/core/Grid';
-import Typography from '@material-ui/core/Typography';
-import Toolbar from '@material-ui/core/Toolbar';
-import Button from '@material-ui/core/Button';
-import Table from '@material-ui/core/Table';
-import TableBody from '@material-ui/core/TableBody';
-import TableCell from '@material-ui/core/TableCell';
-import TableContainer from '@material-ui/core/TableContainer';
-import TableRow from '@material-ui/core/TableRow';
-import Paper from '@material-ui/core/Paper';
-import Switch from '@material-ui/core/Switch';
-import Slider from '@material-ui/core/Slider';
+import Preview from './components/Preview';
+import StatusBar from './components/StatusBar';
+import DataTable from './components/DataTable';
+import DetectorGrid from './components/DetectorGrid';
 
 function formatTime(val) {
     var x = Number(val);
     return (x < 0.001)?((x*1000000).toPrecision(3) + " us"):((x*1000).toPrecision(3) + " ms");   
 }
 
-function formatPedestal(val) {
-    var x = Number(val);
-    if (x === 0) return "0";
-    return x.toPrecision(5);
-}
-
 class App extends Component {
   state = {
      value: {state: "Not connected"},
      expertMode: false,
-     contrast: 10.0
   }
 
   updateREST() {
     fetch('http://' + window.location.hostname + ':5232/', {crossDomain:true})
     .then(res => res.json())
-    .then(data => this.setState({ value: data }))
+    .then(data => {
+         this.setState({ daqState: data.state});
+         this.setState({ params: [
+              {desc: "Frame time", value: formatTime(data.frame_time)},
+              {desc: "Frame time (internal)", value: formatTime(data.frame_time_detector)},
+              {desc: "Count time ", value: formatTime(data.count_time)},
+              {desc: "Count time (internal)", value: formatTime(data.count_time_detector)},
+              {desc: "Frame summation", value: data.summation},
+              {desc: "Compression", value: data.compression},
+              {desc: "Beam center x", value: data.beam_center_x + " pxl"},
+              {desc: "Beam center y", value: data.beam_center_y + " pxl"},
+              {desc: "Detector distance", value: data.detector_distance + " mm"},
+              {desc: "Beamline delay (max)", value: formatTime(data.beamline_delay)},
+              {desc: "Shutter delay", value: formatTime(data.shutter_delay)},
+              {desc: "Energy", value: data.energy_in_keV + " keV"},
+              {desc: "Pedestal G0 frames", value: data.pedestalG0_frames},
+              {desc: "Pedestal G1 frames", value: data.pedestalG1_frames},
+              {desc: "Pedestal G2 frames", value: data.pedestalG2_frames},
+              ]});
+         this.setState({modules: [
+              {name: "Module 6", 
+               bad_pixels: data.bad_pixels_mod6, 
+               meanG0: data.pedestalG0_mean_mod6,  
+               meanG1: data.pedestalG1_mean_mod6,  
+               meanG2: data.pedestalG2_mean_mod6},
+              {name: "Module 7", 
+               bad_pixels: data.bad_pixels_mod7, 
+               meanG0: data.pedestalG0_mean_mod7,  
+               meanG1: data.pedestalG1_mean_mod7,  
+               meanG2: data.pedestalG2_mean_mod7},
+              {name: "Module 4", 
+               bad_pixels: data.bad_pixels_mod4, 
+               meanG0: data.pedestalG0_mean_mod4,  
+               meanG1: data.pedestalG1_mean_mod4,  
+               meanG2: data.pedestalG2_mean_mod4},
+              {name: "Module 5", 
+               bad_pixels: data.bad_pixels_mod5, 
+               meanG0: data.pedestalG0_mean_mod5,  
+               meanG1: data.pedestalG1_mean_mod5,  
+               meanG2: data.pedestalG2_mean_mod5},
+              {name: "Module 3", 
+               bad_pixels: data.bad_pixels_mod3, 
+               meanG0: data.pedestalG0_mean_mod3,  
+               meanG1: data.pedestalG1_mean_mod3,  
+               meanG2: data.pedestalG2_mean_mod3},
+              {name: "Module 2", 
+               bad_pixels: data.bad_pixels_mod2, 
+               meanG0: data.pedestalG0_mean_mod2,  
+               meanG1: data.pedestalG1_mean_mod2,  
+               meanG2: data.pedestalG2_mean_mod2},
+              {name: "Module 1", 
+               bad_pixels: data.bad_pixels_mod1, 
+               meanG0: data.pedestalG0_mean_mod1,  
+               meanG1: data.pedestalG1_mean_mod1,  
+               meanG2: data.pedestalG2_mean_mod1},
+              {name: "Module 0", 
+               bad_pixels: data.bad_pixels_mod0, 
+               meanG0: data.pedestalG0_mean_mod0,  
+               meanG1: data.pedestalG1_mean_mod0,  
+               meanG2: data.pedestalG2_mean_mod0},
+            ]});
+    })
     .catch(error => {
         this.setState({value: {state: "Not connected"}})
      });
@@ -51,10 +96,6 @@ class App extends Component {
     clearInterval(this.interval);
   }
 
-  reinitialize() {
-     fetch('http://' + window.location.hostname + ':5232/detector/api/jf-0.1.0/command/initialize',{method : "PUT"});
-  }
-
   sliderMoved = (event, newValue) => {
     this.setState({contrast: newValue});
   };
@@ -64,132 +105,15 @@ class App extends Component {
   };
 
   render() {
-    return <div>
-         <AppBar position="sticky">
-       <Toolbar>
-       <Typography variant="h6" style={{flexGrow: 0.5}}>
-           JUNGFRAU 4M 
-       </Typography>
-       <Typography variant="h6" style={{flexGrow: 2.0}}>
-           State: {this.state.value.state}
-       </Typography>
-       <Switch checked={this.state.expertMode} onChange={this.handleChange} name="expertMode" />
-       <Typography variant="h6" style={{flexGrow: 0.2}}>
-       Expert mode
-       </Typography>
-       <Button color="secondary" onClick={this.reinitialize} variant="contained" disableElevation>Initialize</Button>
-       </Toolbar>
-       </AppBar>
+    return <div><StatusBar daqState={this.state.daqState} handleChange={this.handleChange} expertMode={this.state.expertMode} />
      <br/><br/>
 
      {this.state.expertMode?
-     <div><TableContainer component={Paper} style={{width: 650, marginLeft: "auto", marginRight: "auto"}}>
-      <Table size="small"  aria-label="simple table">
-          <TableBody>
-            <TableRow>
-              <TableCell component="th" scope="row"> Frame time </TableCell>
-              <TableCell align="right">{formatTime(this.state.value.frame_time)}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell component="th" scope="row"> Frame time (internal)</TableCell>
-              <TableCell align="right">{formatTime(this.state.value.frame_time_detector)}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell component="th" scope="row"> Count time </TableCell>
-              <TableCell align="right">{formatTime(this.state.value.count_time)}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell component="th" scope="row"> Count time (internal)</TableCell>
-              <TableCell align="right">{formatTime(this.state.value.count_time_detector)}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell component="th" scope="row"> Frame summation </TableCell>
-              <TableCell align="right">{this.state.value.summation}</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell component="th" scope="row"> Compression </TableCell>
-              <TableCell align="right">{this.state.value.compression}</TableCell>
-            </TableRow>
-          </TableBody>
-      </Table>
-    </TableContainer><br/><br/>
-    <Grid container spacing={3}>
-     <Grid item xs={6}>
-          <Paper style={{textAlign: 'center'}}>
-              Module 6<br/>
-              Bad pixels: {this.state.value.bad_pixels_mod6}<br/>
-              Mean pedestal G0: {formatPedestal(this.state.value.pedestalG0_mean_mod6)}<br/>
-              Mean pedestal G1: {formatPedestal(this.state.value.pedestalG1_mean_mod6)}<br/>
-              Mean pedestal G2: {formatPedestal(this.state.value.pedestalG2_mean_mod6)}
-          </Paper>
-     </Grid>
-     <Grid item xs={6}>
-          <Paper style={{textAlign: 'center'}}>
-              Module 7<br/>
-              Bad pixels: {this.state.value.bad_pixels_mod7}<br/>
-              Mean pedestal G0: {formatPedestal(this.state.value.pedestalG0_mean_mod7)}<br/>
-              Mean pedestal G1: {formatPedestal(this.state.value.pedestalG1_mean_mod7)}<br/>
-              Mean pedestal G2: {formatPedestal(this.state.value.pedestalG2_mean_mod7)}
-          </Paper>
-     </Grid>
-     <Grid item xs={6}>
-          <Paper style={{textAlign: 'center'}}>
-              Module 4<br/>
-              Bad pixels: {this.state.value.bad_pixels_mod4}<br/>
-              Mean pedestal G0: {formatPedestal(this.state.value.pedestalG0_mean_mod4)}<br/>
-              Mean pedestal G1: {formatPedestal(this.state.value.pedestalG1_mean_mod4)}<br/>
-              Mean pedestal G2: {formatPedestal(this.state.value.pedestalG2_mean_mod4)}
-          </Paper>
-     </Grid>
-     <Grid item xs={6}>
-          <Paper style={{textAlign: 'center'}}>
-              Module 5<br/>
-              Bad pixels: {this.state.value.bad_pixels_mod5}<br/>
-              Mean pedestal G0: {formatPedestal(this.state.value.pedestalG0_mean_mod5)}<br/>
-              Mean pedestal G1: {formatPedestal(this.state.value.pedestalG1_mean_mod5)}<br/>
-              Mean pedestal G2: {formatPedestal(this.state.value.pedestalG2_mean_mod5)}
-          </Paper>
-     </Grid>
-     <Grid item xs={6}>
-          <Paper style={{textAlign: 'center'}}>
-              Module 2<br/>
-              Bad pixels: {this.state.value.bad_pixels_mod2}<br/>
-              Mean pedestal G0: {formatPedestal(this.state.value.pedestalG0_mean_mod2)}<br/>
-              Mean pedestal G1: {formatPedestal(this.state.value.pedestalG1_mean_mod2)}<br/>
-              Mean pedestal G2: {formatPedestal(this.state.value.pedestalG2_mean_mod2)}
-          </Paper>
-     </Grid>
-     <Grid item xs={6}>
-          <Paper style={{textAlign: 'center'}}>
-              Module 3<br/>
-              Bad pixels: {this.state.value.bad_pixels_mod3}<br/>
-              Mean pedestal G0: {formatPedestal(this.state.value.pedestalG0_mean_mod3)}<br/>
-              Mean pedestal G1: {formatPedestal(this.state.value.pedestalG1_mean_mod3)}<br/>
-              Mean pedestal G2: {formatPedestal(this.state.value.pedestalG2_mean_mod3)}
-          </Paper>
-     </Grid>
-     <Grid item xs={6}>
-          <Paper style={{textAlign: 'center'}}>
-              Module 0<br/>
-              Bad pixels: {this.state.value.bad_pixels_mod0}<br/>
-              Mean pedestal G0: {formatPedestal(this.state.value.pedestalG0_mean_mod0)}<br/>
-              Mean pedestal G1: {formatPedestal(this.state.value.pedestalG1_mean_mod0)}<br/>
-              Mean pedestal G2: {formatPedestal(this.state.value.pedestalG2_mean_mod0)}
-          </Paper>
-     </Grid>
-     <Grid item xs={6}>
-          <Paper style={{textAlign: 'center'}}>
-              Module 1<br/>
-              Bad pixels: {this.state.value.bad_pixels_mod1}<br/>
-              Mean pedestal G0: {formatPedestal(this.state.value.pedestalG0_mean_mod1)}<br/>
-              Mean pedestal G1: {formatPedestal(this.state.value.pedestalG1_mean_mod1)}<br/>
-              Mean pedestal G2: {formatPedestal(this.state.value.pedestalG2_mean_mod1)}
-          </Paper>
-     </Grid>
-     </Grid><br/><br/>
+     <div><DataTable params={this.state.params}/><br/><br/>
+     <DetectorGrid modules={this.state.modules}/><br/><br/>
      <iframe title="grafana" src="http://mx-jungfrau-1:3000/d-solo/npmZQ7kMk/servers?orgId=1&theme=light&panelId=12" width="100%" height="250" frameBorder="0"/>
      </div>
-    :<div> <Grid container spacing={2}><Grid item xs={12}> <img src={"http://mx-jungfrau-1:5232/preview/" + this.state.contrast}/></Grid></Grid> <Slider defaultValue={10.0} min={1.0} max={200} onChange={this.sliderMoved}></Slider></div>}
+    :<Preview></Preview>}
     <br/>
 
      </div>
