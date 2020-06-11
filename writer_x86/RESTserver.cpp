@@ -9,7 +9,6 @@
 
 #include "JFWriter.h"
 
-#define PEDESTAL_TIME_CUTOFF (60*60) // collect pedestal every 1 hour
 #define API_VERSION "jf-0.1.0"
 #define KEV_OVER_ANGSTROM 12.398
 
@@ -60,6 +59,7 @@ void full_status(nlohmann::json &j) {
     j["jf_full_speed"] = experiment_settings.jf_full_speed;
     j["nframes_to_collect"] = experiment_settings.nframes_to_collect;
     j["nframes_to_write"] = experiment_settings.nframes_to_write;
+    j["nframes_to_write_per_trigger"] = experiment_settings.nframes_to_write_per_trigger;
 
     j["beam_center_x"] = experiment_settings.beam_x;
     j["beam_center_y"] = experiment_settings.beam_y;
@@ -104,7 +104,8 @@ void update_summation() {
     if (experiment_settings.summation == 1) experiment_settings.pixel_depth = 2;
     else experiment_settings.pixel_depth = 4;
 
-    experiment_settings.nframes_to_write = experiment_settings.nframes_to_write_per_trigger * experiment_settings.ntrigger;
+    if (experiment_settings.ntrigger == 0) experiment_settings.nframes_to_write = experiment_settings.nframes_to_write_per_trigger;
+    else experiment_settings.nframes_to_write = experiment_settings.nframes_to_write_per_trigger * experiment_settings.ntrigger;
 
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG0_frames 
         + experiment_settings.summation * experiment_settings.nframes_to_write
@@ -169,19 +170,6 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_READY) && (command == "arm")) {
         daq_state = STATE_CHANGE;
-
-            // If pedestal is old (or settings changed), need to update it
-            //time_t now;
-            //time(&now);
-            //if (((long)(time - time_pedestalG0.tv_sec) > PEDESTAL_TIME_CUTOFF) 
-            //    && (experiment_settings.pedestalG0_frames == 0)) 
-            //    jfwriter_pedestalG0();
-            //if (((long)(time - time_pedestalG1.tv_sec) > PEDESTAL_TIME_CUTOFF) 
-            //    || ((long)(time - time_pedestalG2.tv_sec) > PEDESTAL_TIME_CUTOFF)) {
-            //    jfwriter_pedestalG1(); 
-            //    jfwriter_pedestalG2();
-            //}
-
         if (jfwriter_arm()) daq_state = STATE_ERROR;
         else daq_state = STATE_ACQUIRE;
     } else if ((daq_state == STATE_READY) && (command == "pedestal")) {
@@ -212,6 +200,7 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
 
     if (daq_state != STATE_READY) {
         response.send(Pistache::Http::Code::Bad_Request);
+        pthread_mutex_unlock(&daq_state_mutex);
         return;
     }
 
@@ -260,6 +249,7 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
     }
 
     else if (variable == "frame_time") experiment_settings.frame_time = json_input["value"].get<float>();
+    else if (variable == "count_time") ; // This cannot be set
 
     // Change of internal detector frame time invalidates pedestal for G0 (as this one is collected at actual frame rate)
     else if (variable == "frame_time_detector") {
@@ -330,7 +320,12 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
     else if (variable == "pedestalG1_frames") {j["value"] = experiment_settings.pedestalG1_frames; j["value_type"] = "uint";}
     else if (variable == "pedestalG2_frames") {j["value"] = experiment_settings.pedestalG2_frames; j["value_type"] = "uint";}
     else if (variable == "speed") {j["value"] = experiment_settings.jf_full_speed? "full":"half"; j["value_type"] = "string"; j["allowed_values"] ={"full", "half"};}
-    else if (variable == "mode") {
+
+    else if (variable == "compression") {
+        if (writer_settings.compression == JF_COMPRESSION_NONE) j["value"] = "";
+        else if (writer_settings.compression == JF_COMPRESSION_BSHUF_LZ4) j["value"] = "bslz4";
+        else if (writer_settings.compression == JF_COMPRESSION_BSHUF_ZSTD) j["value"] = "bszstd";
+    } else if (variable == "mode") {
         j["value_type"] = "string"; j["allowed_values"] ={"converted", "raw", "pedestalG0", "pedestalG1", "pedestalG2"};
         if (experiment_settings.conversion_mode == MODE_CONV) j["value"] = "converted";
         if (experiment_settings.conversion_mode == MODE_RAW) j["value"] = "raw";
@@ -347,6 +342,8 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
     } else if (variable == "pedestalG2") {
          response.send(Pistache::Http::Code::Ok, (char *) gain_pedestal.pedeG2, NCARDS * NPIXEL * sizeof(uint16_t), MIME(Application, OctetStream));
          return;
+    } else if (variable == "keys") {
+         j = {"wavelength" , "photon_energy", "frame_time", "count_time", "frame_time_detector", "count_time_detector", "beamline_delay", "shutter_delay"};
     } else {
 	 response.send(Pistache::Http::Code::Not_Found, "Key " + variable + " doesn't exists");
          return;
@@ -362,6 +359,7 @@ void filewriter_set(const Pistache::Rest::Request& request, Pistache::Http::Resp
 
     if (daq_state != STATE_READY) {
         response.send(Pistache::Http::Code::Bad_Request);
+        pthread_mutex_unlock(&daq_state_mutex);
         return;
     }
 
@@ -371,6 +369,7 @@ void filewriter_set(const Pistache::Rest::Request& request, Pistache::Http::Resp
 
     if (variable == "nimages_per_file") writer_settings.images_per_file = json_input["value"].get<int>();
     else if (variable == "name_pattern") writer_settings.HDF5_prefix = json_input["value"].get<std::string>();
+    else if (variable == "compression_enabled");
     else if (variable == "format") { 
         if (json_input["value"].get<std::string>() == "binary") writer_settings.write_hdf5 = false;
         if (json_input["value"].get<std::string>() == "hdf5") writer_settings.write_hdf5 = true;
@@ -402,10 +401,23 @@ void detector_state(const Pistache::Rest::Request& request, Pistache::Http::Resp
 
 void fetch_preview(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
     response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
-    pthread_mutex_lock(&preview_jpeg_mutex);
-    update_jpeg_preview();
-    auto res = response.send(Pistache::Http::Code::Ok, (char *)preview_jpeg.data(), preview_jpeg.size(), MIME(Image,Jpeg));
-    res.then ([](ssize_t bytes) {pthread_mutex_unlock(&preview_jpeg_mutex);}, Pistache::Async::NoExcept);
+    auto variable = request.param(":variable").as<double>();
+    
+    std::vector<uint8_t> *jpeg = new std::vector<uint8_t>;
+    update_jpeg_preview(*jpeg, variable);
+
+    response.send(Pistache::Http::Code::Ok, (char *)jpeg->data(), jpeg->size(), MIME(Image,Jpeg));
+
+}
+
+void fetch_preview_log(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
+    auto variable = request.param(":variable").as<double>();
+    
+    std::vector<uint8_t> *jpeg = new std::vector<uint8_t>;
+    update_jpeg_preview_log(*jpeg, variable);
+
+    response.send(Pistache::Http::Code::Ok, (char *)jpeg->data(), jpeg->size(), MIME(Image,Jpeg));
 
 }
 
@@ -445,8 +457,12 @@ int main() {
     Pistache::Rest::Routes::Put(router, "/filewriter/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&filewriter_set));
     Pistache::Rest::Routes::Options(router, "/filewriter/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&allow));
     Pistache::Rest::Routes::Get(router, "/filewriter/api/" API_VERSION "/config/:variable", Pistache::Rest::Routes::bind(&filewriter_get));
+    
+    // There is no stream, but this is needed to interface with DA+
+    Pistache::Rest::Routes::Get(router, "/stream/api/" API_VERSION "/status/state", Pistache::Rest::Routes::bind(&detector_state));
 
-    Pistache::Rest::Routes::Get(router, "/preview", Pistache::Rest::Routes::bind(&fetch_preview));
+    Pistache::Rest::Routes::Get(router, "/preview/:variable", Pistache::Rest::Routes::bind(&fetch_preview));
+    Pistache::Rest::Routes::Get(router, "/preview_log/:variable", Pistache::Rest::Routes::bind(&fetch_preview_log));
     Pistache::Rest::Routes::Get(router, "/", Pistache::Rest::Routes::bind(&full_detector_state));
     
     auto opts = Pistache::Http::Endpoint::options().threads(PISTACHE_THREADS);
