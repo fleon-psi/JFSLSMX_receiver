@@ -1,6 +1,8 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
+#include <iostream>
+#include <vector>
 
 #include "JFWriter.h"
 
@@ -12,39 +14,56 @@
 #define GREEN_MAX 0
 #define BLUE_MAX 0
 
-int update_jpeg_preview() {
-    int32_t overload;
-    int32_t bad_pixel;
-    int32_t preview_max = 0;
+int update_jpeg_preview(std::vector<uchar> &jpeg_out, float contrast) {
+    cv::setNumThreads(4);
 
-    if (experiment_settings.pixel_depth == 2) {overload= INT16_MAX - 10; bad_pixel = INT16_MIN + 10;}
-    if (experiment_settings.pixel_depth == 4) {overload= INT32_MAX; bad_pixel = INT32_MIN;}
-
-    for (int i = 0; i < YPIXEL * XPIXEL; i++) {
-        if ((preview[i] > preview_max) && (preview[i] < overload)) preview_max = preview[i];
-    }
-    cv::Mat image(YPIXEL, XPIXEL, CV_16UC3);
-
+    cv::Mat values(YPIXEL, XPIXEL, CV_8U);
+    
     // Color transformation
     for (int i = 0; i < YPIXEL; i++) {
-    for (int j = 0; j < XPIXEL; j++) {
-        uint8_t r,g,b;
-        if (preview[i] <= bad_pixel) {r = UINT8_MAX; g = 0; b = 0;} // Red
-        else if (preview[i] >= overload) {r = 0; g = 0; b = UINT8_MAX;} // Blue
-        else {
-            float intensity = (float) preview[i] / (float) preview_max;
-            if (intensity >= 0) {
-               r = intensity * RED_MAX + (1-intensity) * RED_ZERO; 
-               g = intensity * GREEN_MAX + (1-intensity) * GREEN_ZERO; 
-               b = intensity * BLUE_MAX + (1-intensity) * BLUE_ZERO; 
-            } else { r = RED_ZERO; g = GREEN_ZERO; b = BLUE_ZERO;}
+        for (int j = 0; j < XPIXEL; j++) {
+            float tmp = ((float) preview[i*XPIXEL+j]) / contrast;
+            if (tmp >= 1.0) 
+               values.at<uchar>(i,j) = 255;
+            if (tmp <= 0.0)
+               values.at<uchar>(i,j) = 0;
+            else
+               values.at<uchar>(i,j) = (uchar) std::lround(255.0 * tmp);
         }
-        // OpenCV uses BGR, not RGB
-        image.at<cv::Vec3b>(i,j)[2] = r; image.at<cv::Vec3b>(i,j)[1] = g; image.at<cv::Vec3b>(i,j)[0] = b;
     }
+
+
+    cv::Mat image(YPIXEL, XPIXEL, CV_8UC3);
+    cv::applyColorMap(values, image,  cv::COLORMAP_VIRIDIS);
+//    cv::blur(image, image, cv::Size(3,3));
+
+//    cv::Mat tmp(YPIXEL/2, XPIXEL/2, CV_8UC3);
+//    cv::pyrDown(image, tmp);
+    cv::imencode(".jpeg", image, jpeg_out); 
+    return 0;
+}
+
+int update_jpeg_preview_log(std::vector<uchar> &jpeg_out, float contrast) {
+    cv::setNumThreads(4);
+
+    cv::Mat values(YPIXEL, XPIXEL, CV_8U);
+    
+    // Color transformation
+    for (int i = 0; i < YPIXEL; i++) {
+        for (int j = 0; j < XPIXEL; j++) {
+            float tmp = preview[i*XPIXEL+j];
+            if (tmp >= contrast) 
+               values.at<uchar>(i,j) = 255;
+            if (tmp < 1.0)
+               values.at<uchar>(i,j) = 0;
+            else
+               values.at<uchar>(i,j) = (uchar) std::lround(255.0 * log(tmp)/log(contrast));
+        }
     }
-    std::vector<uchar> buf;
-    cv::imencode("jpg", image, buf); 
-    preview_jpeg = buf;
+
+    cv::Mat image(YPIXEL, XPIXEL, CV_8UC3);
+    cv::applyColorMap(values, image,  cv::COLORMAP_VIRIDIS);
+
+    cv::imencode(".jpeg", image, jpeg_out); 
     return 0;
 }
