@@ -62,7 +62,11 @@ int jfwriter_close() {
         return 0;
 }
 
-int jfwriter_arm() {
+
+// Start and stop are low level procedures to execute any measurement
+// Arm, disarm and pedestalG0/1/2 are wrappers for actual tasks
+
+int jfwriter_start() {
 	for (int i = 0; i < NCARDS; i++) {
             if (connect_to_power9(i)) return 1;
 	    remaining_frames[i] = experiment_settings.nframes_to_write;
@@ -94,7 +98,6 @@ int jfwriter_arm() {
                             writer_thread_arg[i].card_id = 0;
 			int ret = pthread_create(&(writer[i]), NULL, writer_thread, &(writer_thread_arg[i]));
 		}
-                std::cout << "Threads started" << std::endl;
         }
 
         // Barrier #2 - All threads are set up running
@@ -111,7 +114,7 @@ int jfwriter_arm() {
         return 0;
 }
 
-int jfwriter_disarm() {
+int jfwriter_stop() {
 	if (experiment_settings.conversion_mode == MODE_QUIT)
             return 0;
 
@@ -167,18 +170,20 @@ void count_bad_pixel() {
 int jfwriter_pedestalG0() {
     experiment_settings_t tmp_settings = experiment_settings;
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG0_frames;
+
     experiment_settings.nframes_to_write = 0;
     experiment_settings.ntrigger = 0;
     experiment_settings.conversion_mode = MODE_PEDEG0;
     writer_settings.timing_trigger = false;
 
-    if (jfwriter_arm() == 1) return 1;
+    if (jfwriter_start() == 1) return 1;
     if (jfwriter_disarm() == 1) return 1;
     time_pedestalG0 = time_start;    
 
     experiment_settings = tmp_settings;
     calc_mean_pedestal(gain_pedestal.pedeG0, mean_pedestalG0);
     count_bad_pixel();
+
     return 0;
 }
 
@@ -190,7 +195,7 @@ int jfwriter_pedestalG1() {
     experiment_settings.conversion_mode = MODE_PEDEG1;
     writer_settings.timing_trigger = false;
 
-    if (jfwriter_arm() == 1) return 1;
+    if (jfwriter_start() == 1) return 1;
     if (jfwriter_disarm() == 1) return 1;
     time_pedestalG1 = time_start;    
     
@@ -208,7 +213,7 @@ int jfwriter_pedestalG2() {
     experiment_settings.conversion_mode = MODE_PEDEG2;
     writer_settings.timing_trigger = false;
 
-    if (jfwriter_arm() == 1) return 1;
+    if (jfwriter_start() == 1) return 1;
     if (jfwriter_disarm() == 1) return 1;
 
     time_pedestalG2 = time_start;
@@ -217,4 +222,25 @@ int jfwriter_pedestalG2() {
     calc_mean_pedestal(gain_pedestal.pedeG2, mean_pedestalG2);
     count_bad_pixel();
     return 0;
+}
+
+// Arm is logic on measuring actual dataset
+int jfwriter_arm() {
+    time_t now;
+    time(&now);
+    if (((long)(time - time_pedestalG0.tv_sec) > PEDESTAL_TIME_CUTOFF)
+        && (experiment_settings.pedestalG0_frames == 0))
+        if (jfwriter_pedestalG0()) return 1;
+    if (((long)(time - time_pedestalG1.tv_sec) > PEDESTAL_TIME_CUTOFF)
+                || ((long)(time - time_pedestalG2.tv_sec) > PEDESTAL_TIME_CUTOFF)) {
+                if (jfwriter_pedestalG1()) return 1;
+                if (jfwriter_pedestalG2()) return 1;
+    }
+
+    writer_settings.timing_trigger = true;
+    return jfwriter_start();
+}
+
+int jfwriter_disarm() {
+    return jfwriter_stop();
 }
