@@ -29,12 +29,12 @@
 
 #define TIMEOUT 600
 
-#define NFRAMES_PER_STREAM 320L
+#define NIMAGES_PER_STREAM 320L
 #define NCUDA_STREAMS 6
 #define CUDA_TO_IB_BUFFER 2L // How much larger is IB buffer as compared to CUDA
 
 #define RDMA_SQ_PSN 532
-#define RDMA_SQ_SIZE (NCUDA_STREAMS*CUDA_TO_IB_BUFFER*NFRAMES_PER_STREAM) // 3840, size of send queue, must be multiplier of frames per CUDA stream
+#define RDMA_SQ_SIZE (NCUDA_STREAMS*CUDA_TO_IB_BUFFER*NIMAGES_PER_STREAM) // 3840, size of send queue, must be multiplier of frames per CUDA stream
 
 extern experiment_settings_t experiment_settings;
 
@@ -52,6 +52,13 @@ struct receiver_settings_t {
         int gpu_device;
 };
 extern receiver_settings_t receiver_settings;
+
+// Definition of strong pixel
+struct strong_pixel {
+    int16_t col;      // column
+    int16_t line;     // line (relative to chunk (2x vertical modules) read by GPU)
+    uint32_t photons; // intensity of the pixel
+};
 
 // Definition of Bragg spot
 struct spot_t {

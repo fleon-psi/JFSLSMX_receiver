@@ -8,24 +8,30 @@
 #include <pthread.h>
 #include "JFReceiver.h"
 
+// Maximum number of strong pixel in 2 veritcal modules
+// if there are more pixels, these will be overwritten
+// in ring buffer fashion
 #define MAX_STRONG 8192L
 
+// Size of bounding box for pixel
 #define NBX 3
 #define NBY 3
 
+// TODO - this should be in common header
 #define COLS (2*1030L)
 #define LINES (514L)
 
+// modules are stacked two vertically
+// 67 (modules 6 and 7)
+// 45
+// 32
+// 01
+// --> but this part of app cares about four top/bottom modules
+// --> so one chunk will be 67 and another 45 (or resp. 32 and 01)
 #define FRAME_SIZE ((NMODULES/2) * COLS * LINES * sizeof(int16_t))
 
+// CUDA calculation streams
 cudaStream_t stream[NCUDA_STREAMS];
-
-struct strong_pixel {
-    int16_t col;
-    int16_t line;
-    uint32_t photons;
-};
-
 
 // GPU kernel to find strong pixels
 template<typename T>
@@ -126,36 +132,39 @@ int32_t *gpu_data32;
 strong_pixel *gpu_out;
 
 int setup_gpu(int device) {
-    std::cout << "GPU: Setup start of device " << device << std::endl;
+    // Set device
     cudaSetDevice(device);
 
+    // Register image buffer as HW pinned (this is also registered by IB verbs)
     cudaError_t err = cudaHostRegister(ib_buffer, ib_buffer_size, cudaHostRegisterPortable);
     if (err != cudaSuccess) {
-         std::cout << "GPU: Register error " << cudaGetErrorString(err) << " addr " << ib_buffer << " size " << ib_buffer_size << std::endl;
+         std::cerr << "GPU: Register error " << cudaGetErrorString(err) << " addr " << ib_buffer << " size " << ib_buffer_size << std::endl;
          return 1;
     }
 
-    size_t gpu_data16_size = NCUDA_STREAMS * NFRAMES_PER_STREAM * FRAME_SIZE;
+    // Initialize input memory on GPU
+    size_t gpu_data16_size = NCUDA_STREAMS * NIMAGES_PER_STREAM * FRAME_SIZE;
     err = cudaMalloc((void **) &gpu_data16, gpu_data16_size);
     if (err != cudaSuccess) {
-         std::cout << "GPU: Mem alloc. error (data) " <<  gpu_data16_size / 1024 / 1024 << std::endl;
+         std::cerr << "GPU: Mem alloc. error (data) " <<  gpu_data16_size / 1024 / 1024 << std::endl;
          return 1;
     }
 
-    err = cudaMalloc((void **) &gpu_out, NCUDA_STREAMS * NFRAMES_PER_STREAM * 2 * MAX_STRONG * sizeof(strong_pixel)); // frame is divided into 2 vertical slices
+    // Initialize output memory on GPU
+    err = cudaMalloc((void **) &gpu_out, NCUDA_STREAMS * NIMAGES_PER_STREAM * 2 * MAX_STRONG * sizeof(strong_pixel)); // frame is divided into 2 vertical slices
     if (err != cudaSuccess) {
-         std::cout << "GPU: Mem alloc. error (output)" << std::endl;
+         std::cerr << "GPU: Mem alloc. error (output)" << std::endl;
          return 1;
     }
 
+    // Create computing streams
     for (int i = 0; i < NCUDA_STREAMS; i++) {
         err = cudaStreamCreate(&stream[i]);
         if (err != cudaSuccess) {
-            std::cout << "GPU: Stream create error" << std::endl;
+            std::cerr << "GPU: Stream create error" << std::endl;
             return 1;
         }
     }
-    std::cout << "GPU: setup done" << std::endl;
 
     // Setup synchronization
     for (int i = 0; i < NCUDA_STREAMS*CUDA_TO_IB_BUFFER; i++) {
@@ -175,7 +184,7 @@ int close_gpu() {
     for (int i = 0; i < NCUDA_STREAMS; i++)
         err = cudaStreamDestroy(stream[i]);
 
-    // Setup synchronization
+    // Close synchronization
     for (int i = 0; i < NCUDA_STREAMS*CUDA_TO_IB_BUFFER; i++) {
             pthread_mutex_destroy(cuda_stream_ready_mutex+i);
             pthread_cond_destroy(cuda_stream_ready_cond+i);
@@ -213,11 +222,13 @@ void merge_spots_new_frame(spot_t &spot1, const spot_t &spot2) {
     }
 }
 
-
+// Creates a continous spot
+// strong pixels are loaded into dictionary (one dictionary per frame)
+// and routine checks if neighboring pixels are also in dictionary (likely in log(N) time)
 spot_t add_pixel(std::map<std::pair<uint16_t, uint16_t>, uint64_t> *dictionary, uint64_t frame, uint16_t module, uint16_t line, uint16_t col) {
     spot_t ret_value;
-    std::map<std::pair<uint16_t, uint16_t>, uint64_t>::iterator iterator = dictionary[frame*NFRAMES_PER_STREAM+module].find(std::pair<uint16_t, uint16_t>(line,col));
-    if (iterator != dictionary[frame*NFRAMES_PER_STREAM+module].end()) {
+    std::map<std::pair<uint16_t, uint16_t>, uint64_t>::iterator iterator = dictionary[frame*NIMAGES_PER_STREAM+module].find(std::pair<uint16_t, uint16_t>(line,col));
+    if (iterator != dictionary[frame*NIMAGES_PER_STREAM+module].end()) {
         uint64_t photons = iterator->second;
         ret_value.module = module;
         ret_value.x = line * (double)photons; // position is weighted by number of photon counts
@@ -227,7 +238,7 @@ spot_t add_pixel(std::map<std::pair<uint16_t, uint16_t>, uint64_t> *dictionary, 
         ret_value.pixels = 1;
         ret_value.depth = 0;
 
-        dictionary[frame*NFRAMES_PER_STREAM+module].erase(iterator); // Remove strong pixel from the dictionary, so it is not processed again
+        dictionary[frame*NIMAGES_PER_STREAM+module].erase(iterator); // Remove strong pixel from the dictionary, so it is not processed again
 
         // Recursively analyze all neighbors 
         merge_spots(ret_value, add_pixel(dictionary, frame, module, line+1, col-1));
@@ -239,7 +250,7 @@ spot_t add_pixel(std::map<std::pair<uint16_t, uint16_t>, uint64_t> *dictionary, 
         merge_spots(ret_value, add_pixel(dictionary, frame, module, line, col+1));
         merge_spots(ret_value, add_pixel(dictionary, frame, module, line, col-1));
         // Recursively check if spot in next frame is also strong
-        if (frame + 1 < NFRAMES_PER_STREAM) merge_spots_new_frame(ret_value, add_pixel(dictionary, frame + 1, module, line, col));
+        if (frame + 1 < NIMAGES_PER_STREAM) merge_spots_new_frame(ret_value, add_pixel(dictionary, frame + 1, module, line, col));
     } else {
         ret_value.photons = 0;
         ret_value.pixels = 0;
@@ -250,7 +261,7 @@ spot_t add_pixel(std::map<std::pair<uint16_t, uint16_t>, uint64_t> *dictionary, 
 
 // Gather spots
 void process_frames(std::map<std::pair<uint16_t, uint16_t>, uint64_t> *dictionary, std::vector<spot_t> &spots) {
-   for (int i = 0; i < NFRAMES_PER_STREAM*2; i++) {
+   for (int i = 0; i < NIMAGES_PER_STREAM*2; i++) {
       std::map<std::pair<uint16_t, uint16_t>, uint64_t>::iterator iterator = dictionary[i].begin();
       while (iterator != dictionary[i].end()) {
           spot_t spot = add_pixel(dictionary, i / 2, i % 2, iterator->first.first, iterator->first.second);
@@ -265,10 +276,10 @@ void process_frames(std::map<std::pair<uint16_t, uint16_t>, uint64_t> *dictionar
 
 void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots) {
     // key is location of strong pixel - value is number of photons
-    std::map<std::pair<uint16_t, uint16_t>, uint64_t> dictionary[NFRAMES_PER_STREAM*2]; 
+    std::map<std::pair<uint16_t, uint16_t>, uint64_t> dictionary[NIMAGES_PER_STREAM*2]; 
 
     // Transfer strong pixels into dictionary
-    for (size_t i = 0; i < NFRAMES_PER_STREAM*2; i++) {
+    for (size_t i = 0; i < NIMAGES_PER_STREAM*2; i++) {
         size_t addr = i * MAX_STRONG;
         int k = 0;
         while ((k < MAX_STRONG) && (host_out[addr + k].col >= 0)) {
@@ -287,8 +298,8 @@ void *run_gpu_thread(void *in_threadarg) {
     std::vector<spot_t> spots;
 
     // Account for leftover
-    size_t total_chunks = experiment_settings.nimages_to_write / NFRAMES_PER_STREAM;
-    if (experiment_settings.nimages_to_write - total_chunks * NFRAMES_PER_STREAM > 0)
+    size_t total_chunks = experiment_settings.nimages_to_write / NIMAGES_PER_STREAM;
+    if (experiment_settings.nimages_to_write - total_chunks * NIMAGES_PER_STREAM > 0)
            total_chunks++;
 
     size_t gpu_slice = arg->ThreadID;
@@ -296,7 +307,7 @@ void *run_gpu_thread(void *in_threadarg) {
     cudaEvent_t event_mem_copied;
     cudaEventCreate (&event_mem_copied);
 
-    strong_pixel *host_out = (strong_pixel *) calloc(NFRAMES_PER_STREAM * 2 * MAX_STRONG, sizeof(strong_pixel));
+    strong_pixel *host_out = (strong_pixel *) calloc(NIMAGES_PER_STREAM * 2 * MAX_STRONG, sizeof(strong_pixel));
 
     for (size_t chunk = gpu_slice;
          chunk < total_chunks;
@@ -304,9 +315,9 @@ void *run_gpu_thread(void *in_threadarg) {
 
          size_t ib_slice = chunk % (NCUDA_STREAMS*CUDA_TO_IB_BUFFER);
 
-//         size_t frame0 = ib_slice * NFRAMES_PER_STREAM;
-         size_t frames = experiment_settings.nimages_to_write - gpu_slice * NFRAMES_PER_STREAM;
-         if (frames > NFRAMES_PER_STREAM) frames = NFRAMES_PER_STREAM;
+//         size_t frame0 = ib_slice * NIMAGES_PER_STREAM;
+         size_t frames = experiment_settings.nimages_to_write - gpu_slice * NIMAGES_PER_STREAM;
+         if (frames > NIMAGES_PER_STREAM) frames = NIMAGES_PER_STREAM;
 
          pthread_mutex_lock(writer_threads_done_mutex+ib_slice);
          // Wait till everyone is done
@@ -321,8 +332,8 @@ void *run_gpu_thread(void *in_threadarg) {
 
          // Copy frames to GPU memory
          cudaError_t err;
-         err = cudaMemcpyAsync(gpu_data16 + (gpu_slice % NCUDA_STREAMS) * NFRAMES_PER_STREAM * FRAME_SIZE / sizeof(uint16_t), 
-               ib_buffer + ib_slice * NFRAMES_PER_STREAM * FRAME_SIZE,
+         err = cudaMemcpyAsync(gpu_data16 + (gpu_slice % NCUDA_STREAMS) * NIMAGES_PER_STREAM * FRAME_SIZE / sizeof(uint16_t), 
+               ib_buffer + ib_slice * NIMAGES_PER_STREAM * FRAME_SIZE,
                frames * FRAME_SIZE,
                cudaMemcpyHostToDevice, stream[gpu_slice]);
          if (err != cudaSuccess) {
@@ -333,9 +344,9 @@ void *run_gpu_thread(void *in_threadarg) {
          cudaEventRecord (event_mem_copied, stream[gpu_slice]);
 
          // Start GPU kernel
-         find_spots_colspot<int16_t> <<<NFRAMES_PER_STREAM * 2 / 32, 32, 0, stream[gpu_slice]>>> 
-                 (gpu_data16 + gpu_slice * NFRAMES_PER_STREAM * FRAME_SIZE / 2, 
-                  gpu_out + gpu_slice * NFRAMES_PER_STREAM * 2 * MAX_STRONG, 
+         find_spots_colspot<int16_t> <<<NIMAGES_PER_STREAM * 2 / 32, 32, 0, stream[gpu_slice]>>> 
+                 (gpu_data16 + gpu_slice * NIMAGES_PER_STREAM * FRAME_SIZE / 2, 
+                  gpu_out + gpu_slice * NIMAGES_PER_STREAM * 2 * MAX_STRONG, 
                   experiment_settings.strong_pixel_value, frames * 2);
 
          // After data are copied, one can release buffer
@@ -352,8 +363,8 @@ void *run_gpu_thread(void *in_threadarg) {
          pthread_mutex_unlock(cuda_stream_ready_mutex+ib_slice);
 
          err = cudaMemcpyAsync(host_out, 
-                         gpu_out + gpu_slice * NFRAMES_PER_STREAM * 2 * MAX_STRONG,
-                         NFRAMES_PER_STREAM * 2 * MAX_STRONG * sizeof(strong_pixel),
+                         gpu_out + gpu_slice * NIMAGES_PER_STREAM * 2 * MAX_STRONG,
+                         NIMAGES_PER_STREAM * 2 * MAX_STRONG * sizeof(strong_pixel),
                          cudaMemcpyDeviceToHost, stream[gpu_slice]);
 
          // Ensure kernel has finished
@@ -367,6 +378,7 @@ void *run_gpu_thread(void *in_threadarg) {
     }
     cudaEventDestroy (event_mem_copied);
 
+    // Merge calculated spots to a single vector
     pthread_mutex_lock(&all_spots_mutex);
     for (int i = 0; i < spots.size(); i++)
         all_spots.push_back(spots[i]);
