@@ -202,6 +202,12 @@ int disconnect_from_power9(int card_id) {
                     (char *) (gain_pedestal.pedeG0 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
         tcp_receive(writer_connection_settings[card_id].sockfd,
                     (char *) (gain_pedestal.pixel_mask + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
+        
+        // Send spots found by spot finder
+        size_t spot_data_size;
+        tcp_receive(writer_connection_settings[card_id].sockfd,(char *) &spot_data_size, sizeof(size_t));
+        std::vector<spot_t> spots(spot_data_size);
+        tcp_receive(writer_connection_settings[card_id].sockfd, (char *) spots.data(), spot_data_size * sizeof(spot_t));
 
 	// Check magic number again - but don't quit, as the program is finishing anyway soon
 	exchange_magic_number(writer_connection_settings[card_id].sockfd);

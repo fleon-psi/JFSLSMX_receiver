@@ -411,11 +411,17 @@ int main(int argc, char **argv) {
            std::cout << "Sending done" << std::endl;
            std::cout << "Good packets " << online_statistics->good_packets << " Frames to collect: " << experiment_settings.nframes_to_collect << std::endl;
            std::cout << "Frames collected " << ((double)(online_statistics->good_packets / NMODULES / 128)) / (double) experiment_settings.nframes_to_collect * 100.0 << "%" << std::endl;
-
+           std::cout << "Spots found " << all_spots.size() << std::endl;
+ 
 	   // Send header data and collection statistics
 	   send(accepted_socket, online_statistics, sizeof(online_statistics_t), 0);
            // Send gain, pedestal and pixel mask
 	   send(accepted_socket, gain_pedestal_data, 7*NPIXEL*sizeof(uint16_t), 0);
+
+           // Send spots found by spot finder
+           size_t spot_data_size = all_spots.size();
+           send(accepted_socket, &spot_data_size, sizeof(size_t), 0);
+           send(accepted_socket, all_spots.data(), spot_data_size * sizeof(spot_t), 0);
 
            // Reset QP
            switch_to_reset(ib_settings);
