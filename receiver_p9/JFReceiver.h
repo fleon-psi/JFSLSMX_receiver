@@ -60,15 +60,6 @@ struct strong_pixel {
     uint32_t photons; // intensity of the pixel
 };
 
-// Definition of Bragg spot
-struct spot_t {
-    double x,y,z;
-    uint16_t module; // number of module - it is impossible for spot to belong to more than one module
-    uint64_t photons; // total photon count
-    uint64_t pixels; // number of pixels
-    uint64_t depth; // on how many frames the spot is present
-};
-
 // Vector containing all spots in the dataset
 extern std::vector<spot_t> all_spots;
 extern pthread_mutex_t all_spots_mutex;

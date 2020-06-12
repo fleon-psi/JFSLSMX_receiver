@@ -78,6 +78,15 @@ struct ib_settings_t {
 	ibv_port_attr port_attr;
 };
 
+// Definition of Bragg spot
+struct spot_t {
+    double x,y,z;
+    uint16_t module; // number of module - it is impossible for spot to belong to more than one module
+    uint64_t photons; // total photon count
+    uint64_t pixels; // number of pixels
+    uint64_t depth; // on how many frames the spot is present
+};
+
 // IB Verbs function wrappers
 int setup_ibverbs(ib_settings_t &settings, std::string ib_device_name, size_t send_queue_size, size_t receive_queue_size);
 int switch_to_rtr(ib_settings_t &settings, uint32_t rq_psn, uint16_t dlid, uint32_t dest_qp_num);
