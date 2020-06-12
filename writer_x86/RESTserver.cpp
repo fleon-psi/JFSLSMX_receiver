@@ -406,8 +406,8 @@ void fetch_preview(const Pistache::Rest::Request& request, Pistache::Http::Respo
     std::vector<uint8_t> *jpeg = new std::vector<uint8_t>;
     update_jpeg_preview(*jpeg, variable);
 
-    response.send(Pistache::Http::Code::Ok, (char *)jpeg->data(), jpeg->size(), MIME(Image,Jpeg));
-
+    auto res = response.send(Pistache::Http::Code::Ok, (char *)jpeg->data(), jpeg->size(), MIME(Image,Jpeg));
+    res.then([jpeg](ssize_t bytes) { delete(jpeg);}, Pistache::Async::NoExcept);
 }
 
 void fetch_preview_log(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
@@ -417,8 +417,9 @@ void fetch_preview_log(const Pistache::Rest::Request& request, Pistache::Http::R
     std::vector<uint8_t> *jpeg = new std::vector<uint8_t>;
     update_jpeg_preview_log(*jpeg, variable);
 
-    response.send(Pistache::Http::Code::Ok, (char *)jpeg->data(), jpeg->size(), MIME(Image,Jpeg));
-
+    auto res = response.send(Pistache::Http::Code::Ok, (char *)jpeg->data(), jpeg->size(), MIME(Image,Jpeg));
+    res.then([jpeg](ssize_t bytes) { delete(jpeg);}, Pistache::Async::NoExcept);
+    
 }
 
 void full_detector_state(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
@@ -463,6 +464,12 @@ int main() {
 
     Pistache::Rest::Routes::Get(router, "/preview/:variable", Pistache::Rest::Routes::bind(&fetch_preview));
     Pistache::Rest::Routes::Get(router, "/preview_log/:variable", Pistache::Rest::Routes::bind(&fetch_preview_log));
+
+    // To reload via browser, something has to change in the address
+    // So dummy variable x is added - it is not read, nor parsed, so JS can change it at regular intervals
+    Pistache::Rest::Routes::Get(router, "/preview/:variable/:x", Pistache::Rest::Routes::bind(&fetch_preview));
+    Pistache::Rest::Routes::Get(router, "/preview_log/:variable/:x", Pistache::Rest::Routes::bind(&fetch_preview_log));
+
     Pistache::Rest::Routes::Get(router, "/", Pistache::Rest::Routes::bind(&full_detector_state));
     
     auto opts = Pistache::Http::Endpoint::options().threads(PISTACHE_THREADS);
