@@ -357,7 +357,7 @@ int saveInt(hid_t location, std::string name, int val, std::string units = "") {
 }
 
 int SaveAngleContainer(hid_t location, std::string name, double start, double increment, std::string units) {
-        size_t nimages = experiment_settings.nframes_to_write;
+        size_t nimages = experiment_settings.nimages_to_write;
 	double val[nimages];
 	for (int i = 0; i < nimages; i++) {
 		val[i] = start + i * increment;
@@ -537,12 +537,12 @@ int write_detector_parameters() {
 
         hid_t grp = createGroup(master_file_id, "/entry/instrument/detector/detectorSpecific","NXcollection");
 	saveDouble(grp,"photon_energy",experiment_settings.energy_in_keV * 1000.0,"eV");
-	saveInt(grp, "nimages",    experiment_settings.nframes_to_write_per_trigger);
+	saveInt(grp, "nimages",    experiment_settings.nimages_to_write_per_trigger);
 	saveInt(grp, "ntrigger",   experiment_settings.ntrigger);
         saveInt(grp, "internal_summation", experiment_settings.summation);
         saveDouble(grp, "frame_time_detector", experiment_settings.frame_time_detector, "s");
         saveDouble(grp, "count_time_detector", experiment_settings.count_time_detector, "s");
-        saveInt(grp, "nimages_per_data_file" , experiment_settings.nframes_to_write);
+        saveInt(grp, "nimages_per_data_file" , experiment_settings.nimages_to_write);
 	saveInt(grp, "x_pixels_in_detector", XPIXEL);
 	saveInt(grp, "y_pixels_in_detector", YPIXEL);
 
@@ -726,7 +726,7 @@ int close_master_hdf5() {
 
 int open_data_hdf5() {
     // Calculate number of frames
-    int32_t frames = experiment_settings.nframes_to_write;
+    int32_t frames = experiment_settings.nimages_to_write;
 
     std::string filename = "";
     if (writer_settings.main_location != "") filename =

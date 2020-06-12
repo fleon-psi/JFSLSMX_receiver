@@ -45,7 +45,7 @@ int jfwriter_setup() {
 	for (int i = 0; i < NCARDS; i++) {
             // Setup IB and allocate memory
             if (setup_infiniband(i)) return 1;
-	    pthread_mutex_init(&(remaining_frames_mutex[i]), NULL);
+	    pthread_mutex_init(&(remaining_images_mutex[i]), NULL);
 	}
         return 0;
 }
@@ -54,7 +54,7 @@ int jfwriter_close() {
 	for (int i = 0; i < NCARDS; i++) {
             // Setup IB and allocate memory
             close_infiniband(i);
-	    pthread_mutex_destroy(&(remaining_frames_mutex[i]));
+	    pthread_mutex_destroy(&(remaining_images_mutex[i]));
 	}
 #ifndef OFFLINE
         delete(det);
@@ -69,7 +69,7 @@ int jfwriter_close() {
 int jfwriter_start() {
 	for (int i = 0; i < NCARDS; i++) {
             if (connect_to_power9(i)) return 1;
-	    remaining_frames[i] = experiment_settings.nframes_to_write;
+	    remaining_images[i] = experiment_settings.nimages_to_write;
 	}
 
 	if (experiment_settings.conversion_mode == MODE_QUIT)
@@ -89,7 +89,7 @@ int jfwriter_start() {
 	for (int i = 0; i < NCARDS; i++)
             if (exchange_magic_number(writer_connection_settings[i].sockfd)) return 1;
 
-	if (experiment_settings.nframes_to_write > 0) {
+	if (experiment_settings.nimages_to_write > 0) {
 		for (int i = 0; i < writer_settings.nthreads; i++) {
 			writer_thread_arg[i].thread_id = i / NCARDS;
                         if (NCARDS > 1) 
@@ -118,7 +118,7 @@ int jfwriter_stop() {
 	if (experiment_settings.conversion_mode == MODE_QUIT)
             return 0;
 
-	if (experiment_settings.nframes_to_write > 0) {
+	if (experiment_settings.nimages_to_write > 0) {
 		for (int i = 0; i < writer_settings.nthreads; i++)
 			int ret = pthread_join(writer[i], NULL);
 	}
@@ -171,7 +171,7 @@ int jfwriter_pedestalG0() {
     experiment_settings_t tmp_settings = experiment_settings;
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG0_frames;
 
-    experiment_settings.nframes_to_write = 0;
+    experiment_settings.nimages_to_write = 0;
     experiment_settings.ntrigger = 0;
     experiment_settings.conversion_mode = MODE_PEDEG0;
     writer_settings.timing_trigger = false;
@@ -190,7 +190,7 @@ int jfwriter_pedestalG0() {
 int jfwriter_pedestalG1() {
     experiment_settings_t tmp_settings = experiment_settings;
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG1_frames;
-    experiment_settings.nframes_to_write = 0;
+    experiment_settings.nimages_to_write = 0;
     experiment_settings.ntrigger = 0;
     experiment_settings.conversion_mode = MODE_PEDEG1;
     writer_settings.timing_trigger = false;
@@ -208,7 +208,7 @@ int jfwriter_pedestalG1() {
 int jfwriter_pedestalG2() {
     experiment_settings_t tmp_settings = experiment_settings;
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG2_frames;
-    experiment_settings.nframes_to_write = 0;
+    experiment_settings.nimages_to_write = 0;
     experiment_settings.ntrigger = 0;
     experiment_settings.conversion_mode = MODE_PEDEG2;
     writer_settings.timing_trigger = false;

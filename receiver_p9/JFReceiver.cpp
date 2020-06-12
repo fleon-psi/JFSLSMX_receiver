@@ -320,7 +320,7 @@ int main(int argc, char **argv) {
 	   std::cout << "IB Ready to send" << std::endl;
            std::cout << "Pixel depth " << experiment_settings.pixel_depth << " byte" << std::endl;
            std::cout << "Energy: " << experiment_settings.energy_in_keV << " keV" << std::endl;
-           std::cout << "Frames to write: " << experiment_settings.nframes_to_write << std::endl;
+           std::cout << "Images to write: " << experiment_settings.nimages_to_write << std::endl;
            std::cout << "Summation: " << experiment_settings.summation << std::endl;
 
            memset(ib_buffer_occupancy, 0, RDMA_SQ_SIZE * sizeof(uint16_t));

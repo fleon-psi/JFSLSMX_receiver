@@ -33,8 +33,8 @@ pthread_cond_t writers_done_per_file_cond = PTHREAD_COND_INITIALIZER;
 size_t total_compressed_size = 0;
 pthread_mutex_t total_compressed_size_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-uint64_t remaining_frames[NCARDS];
-pthread_mutex_t remaining_frames_mutex[NCARDS];
+uint64_t remaining_images[NCARDS];
+pthread_mutex_t remaining_images_mutex[NCARDS];
 
 #ifndef OFFLINE
 sls::Detector *det;

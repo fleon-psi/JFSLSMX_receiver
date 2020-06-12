@@ -150,7 +150,7 @@ int connect_to_power9(int card_id) {
 	ib_wr.sg_list = &ib_sg_entry;
 	ib_wr.next = NULL;
 
-	for (size_t i = 0; (i < number_of_rqs) && (i < experiment_settings.nframes_to_write); i++)
+	for (size_t i = 0; (i < number_of_rqs) && (i < experiment_settings.nimages_to_write); i++)
 	{
 		ib_sg_entry.addr = (uint64_t)(writer_connection_settings[card_id].ib_buffer + COMPOSED_IMAGE_SIZE * experiment_settings.pixel_depth*i);
 		ib_wr.wr_id = i;

@@ -101,8 +101,8 @@ extern pthread_cond_t writers_done_per_file_cond;
 extern size_t total_compressed_size;
 extern pthread_mutex_t total_compressed_size_mutex;
 
-extern uint64_t remaining_frames[NCARDS];
-extern pthread_mutex_t remaining_frames_mutex[NCARDS];
+extern uint64_t remaining_images[NCARDS];
+extern pthread_mutex_t remaining_images_mutex[NCARDS];
 
 extern std::vector<int32_t> preview;
 //extern pthread_mutex_t preview_mutex; // not protected by mutex at the moment, but might be used in the future

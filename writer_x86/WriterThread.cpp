@@ -61,15 +61,15 @@ void *writer_thread(void* thread_arg) {
         if (experiment_settings.pixel_depth == 4) number_of_rqs = RDMA_RQ_SIZE / 2;
 
 	// Lock is necessary for calculating loop condition - number of remaining frames
-	pthread_mutex_lock(&remaining_frames_mutex[card_id]);
+	pthread_mutex_lock(&remaining_images_mutex[card_id]);
 
 	// Receive data and write to file
-	while (remaining_frames[card_id] > 0) {
+	while (remaining_images[card_id] > 0) {
                 // At the very end of the data collection, no need of adding new work requests
 		bool repost_wr = false;
-		if (remaining_frames[card_id] > number_of_rqs) repost_wr = true;
-		remaining_frames[card_id]--;
-		pthread_mutex_unlock(&remaining_frames_mutex[card_id]);
+		if (remaining_images[card_id] > number_of_rqs) repost_wr = true;
+		remaining_images[card_id]--;
+		pthread_mutex_unlock(&remaining_images_mutex[card_id]);
 
 		// Poll CQ for finished receive requests
 		ibv_wc ib_wc;
@@ -162,9 +162,9 @@ void *writer_thread(void* thread_arg) {
 			ibv_post_recv(writer_connection_settings[card_id].ib_settings.qp, &ib_wr, &ib_bad_recv_wr);
 		}
                 // Mutex needs locking to calculate loop condition
-		pthread_mutex_lock(&remaining_frames_mutex[card_id]);
+		pthread_mutex_lock(&remaining_images_mutex[card_id]);
 	}
-	pthread_mutex_unlock(&remaining_frames_mutex[card_id]);
+	pthread_mutex_unlock(&remaining_images_mutex[card_id]);
 
         // Calculate total compression size
 	pthread_mutex_lock(&total_compressed_size_mutex);

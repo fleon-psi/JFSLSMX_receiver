@@ -58,8 +58,8 @@ void full_status(nlohmann::json &j) {
     j["write_hdf5"] = writer_settings.write_hdf5;
     j["jf_full_speed"] = experiment_settings.jf_full_speed;
     j["nframes_to_collect"] = experiment_settings.nframes_to_collect;
-    j["nframes_to_write"] = experiment_settings.nframes_to_write;
-    j["nframes_to_write_per_trigger"] = experiment_settings.nframes_to_write_per_trigger;
+    j["nimages_to_write"] = experiment_settings.nimages_to_write;
+    j["nimages_to_write_per_trigger"] = experiment_settings.nimages_to_write_per_trigger;
 
     j["beam_center_x"] = experiment_settings.beam_x;
     j["beam_center_y"] = experiment_settings.beam_y;
@@ -104,11 +104,11 @@ void update_summation() {
     if (experiment_settings.summation == 1) experiment_settings.pixel_depth = 2;
     else experiment_settings.pixel_depth = 4;
 
-    if (experiment_settings.ntrigger == 0) experiment_settings.nframes_to_write = experiment_settings.nframes_to_write_per_trigger;
-    else experiment_settings.nframes_to_write = experiment_settings.nframes_to_write_per_trigger * experiment_settings.ntrigger;
+    if (experiment_settings.ntrigger == 0) experiment_settings.nimages_to_write = experiment_settings.nimages_to_write_per_trigger;
+    else experiment_settings.nimages_to_write = experiment_settings.nimages_to_write_per_trigger * experiment_settings.ntrigger;
 
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG0_frames 
-        + experiment_settings.summation * experiment_settings.nframes_to_write
+        + experiment_settings.summation * experiment_settings.nimages_to_write
         + experiment_settings.beamline_delay / experiment_settings.frame_time_detector
         + experiment_settings.shutter_delay * experiment_settings.ntrigger / experiment_settings.frame_time_detector;
 }
@@ -119,7 +119,7 @@ void default_parameters() {
     experiment_settings.count_time_detector = COUNT_TIME_HALF_SPEED;
     experiment_settings.summation = 1;
     experiment_settings.frame_time = FRAME_TIME_HALF_SPEED;
-    experiment_settings.nframes_to_write = 0;
+    experiment_settings.nimages_to_write = 0;
     experiment_settings.ntrigger = 0;
     experiment_settings.energy_in_keV = 12.4;
     experiment_settings.pedestalG0_frames = 2000;
@@ -210,7 +210,7 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
 
     if (variable == "wavelength") experiment_settings.energy_in_keV = KEV_OVER_ANGSTROM / json_input["value"].get<float>();
     else if (variable == "photon_energy") experiment_settings.energy_in_keV = json_input["value"].get<float>() / 1000.0;
-    else if (variable == "nimages") experiment_settings.nframes_to_write_per_trigger = json_input["value"].get<int>();
+    else if (variable == "nimages") experiment_settings.nimages_to_write_per_trigger = json_input["value"].get<int>();
     else if (variable == "ntrigger") experiment_settings.ntrigger = json_input["value"].get<int>();
 
     else if (variable == "beam_center_x") experiment_settings.beam_x = json_input["value"].get<float>();

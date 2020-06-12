@@ -166,7 +166,7 @@ void copy_line_mid32(int32_t *destination, int32_t* source, size_t offset) {
 }
 
 void *run_poll_cq_thread(void *in_threadarg) {
-	for (size_t finished_wc = 0; finished_wc < experiment_settings.nframes_to_write; finished_wc++) {
+	for (size_t finished_wc = 0; finished_wc < experiment_settings.nimages_to_write; finished_wc++) {
 		// Poll CQ to reuse ID
 		ibv_wc ib_wc;
 		int num_comp  = ibv_poll_cq(ib_settings.cq, 1, &ib_wc);; // number of completions present in the CQ
@@ -224,18 +224,18 @@ void *run_send_thread(void *in_threadarg) {
     uint32_t current_frame_number = lastModuleFrameNumber();
 
     // Account for leftover
-    size_t total_chunks = experiment_settings.nframes_to_write / NFRAMES_PER_STREAM;
-    if (experiment_settings.nframes_to_write - total_chunks * NFRAMES_PER_STREAM > 0)
+    size_t total_chunks = experiment_settings.nimages_to_write / NFRAMES_PER_STREAM;
+    if (experiment_settings.nimages_to_write - total_chunks * NFRAMES_PER_STREAM > 0)
            total_chunks++;
 
     size_t current_chunk = 0; // assume that receiver_settings.compression_threads << NFRAMES_PER_STREAM
 
-    for (size_t frame = arg->ThreadID;
-    		frame < experiment_settings.nframes_to_write;
-    		frame += receiver_settings.compression_threads) {
+    for (size_t image = arg->ThreadID;
+    		image < experiment_settings.nimages_to_write;
+    		image += receiver_settings.compression_threads) {
         if (receiver_settings.use_gpu) {
             // Synchronization of GPU part with GPU threads
-            size_t new_chunk = frame / NFRAMES_PER_STREAM;
+            size_t new_chunk = image / NFRAMES_PER_STREAM;
 
             // If we operate in the same chunk as before, there is no need to synchronize
             if (current_chunk != new_chunk) {
@@ -252,8 +252,8 @@ void *run_send_thread(void *in_threadarg) {
     	int32_t buffer_id;
 
         // If pixel_depth == 4, then only half of buffer size available
-        if  (experiment_settings.pixel_depth == 2) buffer_id = frame % (RDMA_SQ_SIZE);
-        else  buffer_id = frame % (RDMA_SQ_SIZE / 2);
+        if  (experiment_settings.pixel_depth == 2) buffer_id = image % (RDMA_SQ_SIZE);
+        else  buffer_id = image % (RDMA_SQ_SIZE / 2);
 
         // Make sure buffer is free
     	pthread_mutex_lock(&ib_buffer_occupancy_mutex);
@@ -263,7 +263,7 @@ void *run_send_thread(void *in_threadarg) {
 
     	pthread_mutex_unlock(&ib_buffer_occupancy_mutex);
 
-        size_t collected_frame = frame*experiment_settings.summation;
+        size_t collected_frame = image*experiment_settings.summation;
 
         if (current_frame_number < (collected_frame+experiment_settings.summation-1) + 2) {
     	// Ensure that all frames were already collected, if not wait to try again
@@ -276,7 +276,7 @@ void *run_send_thread(void *in_threadarg) {
         }
 
         if (frame % 100 == 0) {
-           std::cout << "Frame :" << frame << " Backlog = " << current_frame_number - (collected_frame+experiment_settings.summation-1) << " " << online_statistics->head[0] << " " << online_statistics->head[1] << " " << online_statistics->head[2] << " " << online_statistics->head[3] << " " << online_statistics->good_packets << std::endl;
+           std::cout << "Frame :" << image << " Backlog = " << current_frame_number - (collected_frame+experiment_settings.summation-1) << " " << online_statistics->head[0] << " " << online_statistics->head[1] << " " << online_statistics->head[2] << " " << online_statistics->head[3] << " " << online_statistics->good_packets << std::endl;
         }
 
         if (experiment_settings.conversion_mode == MODE_CONV) {
@@ -362,7 +362,7 @@ void *run_send_thread(void *in_threadarg) {
     	ib_wr.num_sge    = 1;
     	ib_wr.opcode     = IBV_WR_SEND_WITH_IMM;
     	ib_wr.send_flags = IBV_SEND_SIGNALED;
-        ib_wr.imm_data   = htonl(frame); // Network order
+        ib_wr.imm_data   = htonl(image); // Network order
         int ret;
     	while ((ret = ibv_post_send(ib_settings.qp, &ib_wr, &ib_bad_wr))) {
                 if (ret != ENOMEM)

@@ -20,8 +20,8 @@ struct experiment_settings_t {
 	uint8_t  conversion_mode;
 
 	uint64_t nframes_to_collect;
-	uint64_t nframes_to_write;
-	uint64_t nframes_to_write_per_trigger;
+	uint64_t nimages_to_write;
+	uint64_t nimages_to_write_per_trigger;
         uint16_t ntrigger;
 
 	uint32_t pedestalG0_frames;

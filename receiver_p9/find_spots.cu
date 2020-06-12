@@ -287,8 +287,8 @@ void *run_gpu_thread(void *in_threadarg) {
     std::vector<spot_t> spots;
 
     // Account for leftover
-    size_t total_chunks = experiment_settings.nframes_to_write / NFRAMES_PER_STREAM;
-    if (experiment_settings.nframes_to_write - total_chunks * NFRAMES_PER_STREAM > 0)
+    size_t total_chunks = experiment_settings.nimages_to_write / NFRAMES_PER_STREAM;
+    if (experiment_settings.nimages_to_write - total_chunks * NFRAMES_PER_STREAM > 0)
            total_chunks++;
 
     size_t gpu_slice = arg->ThreadID;
@@ -305,7 +305,7 @@ void *run_gpu_thread(void *in_threadarg) {
          size_t ib_slice = chunk % (NCUDA_STREAMS*CUDA_TO_IB_BUFFER);
 
 //         size_t frame0 = ib_slice * NFRAMES_PER_STREAM;
-         size_t frames = experiment_settings.nframes_to_write - gpu_slice * NFRAMES_PER_STREAM;
+         size_t frames = experiment_settings.nimages_to_write - gpu_slice * NFRAMES_PER_STREAM;
          if (frames > NFRAMES_PER_STREAM) frames = NFRAMES_PER_STREAM;
 
          pthread_mutex_lock(writer_threads_done_mutex+ib_slice);
