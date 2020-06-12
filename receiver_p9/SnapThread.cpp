@@ -94,7 +94,7 @@ void *run_snap_thread(void *in_threadarg) {
 	mjob.fpga_mac_addr      = receiver_settings.fpga_mac_addr;   // AA:BB:CC:DD:EE:F1
 	mjob.fpga_ipv4_addr     = receiver_settings.fpga_ip_addr;    // 10.1.50.5
         mjob.expected_triggers  = experiment_settings.ntrigger;
-        mjob.frames_per_trigger = experiment_settings.nframes_to_write_per_trigger * experiment_settings.summation;
+        mjob.frames_per_trigger = experiment_settings.nimages_to_write_per_trigger * experiment_settings.summation;
         mjob.delay_per_trigger  = std::lround(experiment_settings.shutter_delay / experiment_settings.frame_time_detector);
 
 	mjob.in_gain_pedestal_data_addr = (uint64_t) gain_pedestal_data;

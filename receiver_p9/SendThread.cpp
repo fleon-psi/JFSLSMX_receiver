@@ -275,7 +275,7 @@ void *run_send_thread(void *in_threadarg) {
             }
         }
 
-        if (frame % 100 == 0) {
+        if (image % 100 == 0) {
            std::cout << "Frame :" << image << " Backlog = " << current_frame_number - (collected_frame+experiment_settings.summation-1) << " " << online_statistics->head[0] << " " << online_statistics->head[1] << " " << online_statistics->head[2] << " " << online_statistics->head[3] << " " << online_statistics->good_packets << std::endl;
         }
 
