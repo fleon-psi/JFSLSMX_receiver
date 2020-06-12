@@ -230,7 +230,7 @@ spot_t add_pixel(std::map<std::pair<uint16_t, uint16_t>, uint64_t> *dictionary, 
     std::map<std::pair<uint16_t, uint16_t>, uint64_t>::iterator iterator = dictionary[frame*NIMAGES_PER_STREAM+module].find(std::pair<uint16_t, uint16_t>(line,col));
     if (iterator != dictionary[frame*NIMAGES_PER_STREAM+module].end()) {
         uint64_t photons = iterator->second;
-        ret_value.module = module;
+        ret_value.module = module + (NMODULES / 2) * receiver_settings.card_number; // returned module number takes into account which card is this one
         ret_value.x = line * (double)photons; // position is weighted by number of photon counts
         ret_value.y = col * (double)photons;
         ret_value.z = frame * (double)photons;
@@ -264,6 +264,8 @@ void process_frames(std::map<std::pair<uint16_t, uint16_t>, uint64_t> *dictionar
    for (int i = 0; i < NIMAGES_PER_STREAM*2; i++) {
       std::map<std::pair<uint16_t, uint16_t>, uint64_t>::iterator iterator = dictionary[i].begin();
       while (iterator != dictionary[i].end()) {
+          // Frame number is i / 2
+          // Module number is i % 2
           spot_t spot = add_pixel(dictionary, i / 2, i % 2, iterator->first.first, iterator->first.second);
 
           // Apply pixel count cut-off and cut-off of number of frames, which spot can span 
