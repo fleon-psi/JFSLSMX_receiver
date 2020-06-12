@@ -25,7 +25,7 @@
 #include <Detector.h>
 #endif
 
-#include "../JFApp.h"
+#include "../include/JFApp.h"
 #define RDMA_RQ_SIZE 16000L // Maximum number of receive elements
 #define NCARDS       2
 #define YPIXEL       (514L * NMODULES * NCARDS / 2)

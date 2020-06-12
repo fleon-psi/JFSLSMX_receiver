@@ -22,7 +22,7 @@
 #define PLUGIN_H
 
 #include <stdint.h>
-#include "../JFApp.h"
+#include "../include/JFApp.h"
 #include "../writer_x86/JFWriter.h"
 
 #ifdef __cplusplus

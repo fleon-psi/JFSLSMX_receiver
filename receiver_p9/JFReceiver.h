@@ -19,7 +19,7 @@
 
 #include <vector>
 
-#include "../JFApp.h"
+#include "../include/JFApp.h"
 #define FRAME_LIMIT 1000000L
 
 #define RECEIVING_DELAY 5
