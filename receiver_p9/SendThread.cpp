@@ -224,18 +224,18 @@ void *run_send_thread(void *in_threadarg) {
     uint32_t current_frame_number = lastModuleFrameNumber();
 
     // Account for leftover
-    size_t total_chunks = experiment_settings.nimages_to_write / NFRAMES_PER_STREAM;
-    if (experiment_settings.nimages_to_write - total_chunks * NFRAMES_PER_STREAM > 0)
+    size_t total_chunks = experiment_settings.nimages_to_write / NIMAGES_PER_STREAM;
+    if (experiment_settings.nimages_to_write - total_chunks * NIMAGES_PER_STREAM > 0)
            total_chunks++;
 
-    size_t current_chunk = 0; // assume that receiver_settings.compression_threads << NFRAMES_PER_STREAM
+    size_t current_chunk = 0; // assume that receiver_settings.compression_threads << NIMAGES_PER_STREAM
 
     for (size_t image = arg->ThreadID;
     		image < experiment_settings.nimages_to_write;
     		image += receiver_settings.compression_threads) {
         if (receiver_settings.use_gpu) {
             // Synchronization of GPU part with GPU threads
-            size_t new_chunk = image / NFRAMES_PER_STREAM;
+            size_t new_chunk = image / NIMAGES_PER_STREAM;
 
             // If we operate in the same chunk as before, there is no need to synchronize
             if (current_chunk != new_chunk) {
