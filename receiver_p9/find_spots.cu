@@ -346,10 +346,11 @@ void *run_gpu_thread(void *in_threadarg) {
          cudaEventRecord (event_mem_copied, stream[gpu_slice]);
 
          // Start GPU kernel
+         // TODO - handle frame summation
          find_spots_colspot<int16_t> <<<NIMAGES_PER_STREAM * 2 / 32, 32, 0, stream[gpu_slice]>>> 
                  (gpu_data16 + gpu_slice * NIMAGES_PER_STREAM * FRAME_SIZE / 2, 
                   gpu_out + gpu_slice * NIMAGES_PER_STREAM * 2 * MAX_STRONG, 
-                  experiment_settings.strong_pixel_value, frames * 2);
+                  experiment_settings.strong_pixel, frames * 2);
 
          // After data are copied, one can release buffer
          err = cudaEventSynchronize(event_mem_copied);
