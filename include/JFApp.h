@@ -41,16 +41,18 @@ struct experiment_settings_t {
         double   beam_y;                // in pixel
         double   detector_distance;     // in mm
         double   transmission;          // 1.0 = full transmission
-        double   total_flux;           // in e/s
+        double   total_flux;            // in e/s
         double   omega_start;           // in degrees
         double   omega_angle_per_image; // in degrees
         double   beam_size_x;           // in micron
         double   beam_size_y;           // in micron
-        double   beamline_delay; // in seconds delay between arm succeed and trigger opening (maximal)
-        double   shutter_delay;  // in seconds delay between trigger and shutter
+        double   beamline_delay;        // in seconds delay between arm succeed and trigger opening (maximal)
+        double   shutter_delay;         // in seconds delay between trigger and shutter
+        double   sample_temperature;    // in K
 
-        double   strong_pixel_value;
-        double sample_temperature; // in K
+        bool     enable_spot_finding;          // true = spot finding is ON
+        bool     connect_spots_between_frames; // true = rotation measurement, false = raster, jet
+        double   strong_pixel_value;           // STRONG_PIXEL in XDS
 };
 
 struct receiver_output_t {
