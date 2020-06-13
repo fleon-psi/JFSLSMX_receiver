@@ -233,7 +233,7 @@ void *run_send_thread(void *in_threadarg) {
     for (size_t image = arg->ThreadID;
     		image < experiment_settings.nimages_to_write;
     		image += receiver_settings.compression_threads) {
-        if (receiver_settings.use_gpu) {
+        if (experiment_settings.enable_spot_finding) {
             // Synchronization of GPU part with GPU threads
             size_t new_chunk = image / NIMAGES_PER_STREAM;
 

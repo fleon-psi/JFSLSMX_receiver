@@ -52,7 +52,7 @@ struct experiment_settings_t {
 
         bool     enable_spot_finding;          // true = spot finding is ON
         bool     connect_spots_between_frames; // true = rotation measurement, false = raster, jet
-        double   strong_pixel_value;           // STRONG_PIXEL in XDS
+        double   strong_pixel;                 // STRONG_PIXEL in XDS
 };
 
 struct receiver_output_t {

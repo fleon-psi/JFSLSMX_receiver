@@ -27,7 +27,6 @@ int parse_input(int argc, char **argv) {
 	receiver_settings.fpga_ip_addr = 0x0A013205;
 	receiver_settings.tcp_port = 52320;
 	receiver_settings.pedestal_file_name = "pedestal_card0.dat";
-        receiver_settings.use_gpu = false;
         receiver_settings.gpu_device = 0;
 
 	receiver_settings.gain_file_name[0] =
@@ -65,9 +64,6 @@ int parse_input(int argc, char **argv) {
 			       "/home/jungfrau/JF4M_X06SA_200511/gainMaps_M373_2020-01-31.bin";
                         }
 			break;
-                case 'G':
-                        receiver_settings.use_gpu = true;
-                        break;
 		case 't':
 			receiver_settings.compression_threads = atoi(optarg);
 			break;
@@ -346,7 +342,7 @@ int main(int argc, char **argv) {
 
 
            // Reset counter for GPU synchronization
-           if (receiver_settings.use_gpu) {
+           if (experiment_settings.enable_spot_finding) {
                for (int i = 0; i < NCUDA_STREAMS*CUDA_TO_IB_BUFFER; i++) {
                    writer_threads_done[i] = 0;
                    cuda_stream_ready[i]   = i;
@@ -384,7 +380,7 @@ int main(int argc, char **argv) {
            TCP_exchange_magic_number();
 
            // Check for GPU thread completion
-           if (receiver_settings.use_gpu) {
+           if (experiment_settings.enable_spot_finding) {
                for (int i = 0; i < NCUDA_STREAMS; i++) {
 	           ret = pthread_join(gpu_thread[i], NULL);
 	           PTHREAD_ERROR(ret, pthread_join);

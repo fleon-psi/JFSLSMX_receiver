@@ -41,6 +41,8 @@ std::string state_to_string() {
    }
 }
 
+// Save the whole status of DAQ to JSON
+// Useful for webpage, so it doesn't need to query parameters one by one
 void full_status(nlohmann::json &j) {
     j["frame_time_detector"] = experiment_settings.frame_time_detector;
     j["count_time_detector"] = experiment_settings.count_time_detector;
@@ -55,7 +57,6 @@ void full_status(nlohmann::json &j) {
     j["pixel_depth"] = experiment_settings.pixel_depth;
     j["ntrigger"] = experiment_settings.ntrigger;
     j["hdf5_prefix"] = writer_settings.HDF5_prefix;
-    j["write_hdf5"] = writer_settings.write_hdf5;
     j["jf_full_speed"] = experiment_settings.jf_full_speed;
     j["nframes_to_collect"] = experiment_settings.nframes_to_collect;
     j["nimages_to_write"] = experiment_settings.nimages_to_write;
@@ -66,9 +67,18 @@ void full_status(nlohmann::json &j) {
     j["detector_distance"] = experiment_settings.detector_distance;
     j["energy_in_keV"] = experiment_settings.energy_in_keV;
 
+    j["enable_spot_finding"] = experiment_settings.enable_spot_finding?"true":"false";
+    j["strong_pixel"] = experiment_settings.strong_pixel;
+
     if (writer_settings.compression == JF_COMPRESSION_NONE) j["compression"] = ""; 
     else if (writer_settings.compression == JF_COMPRESSION_BSHUF_LZ4) j["compression"] = "bslz4"; 
     else if (writer_settings.compression == JF_COMPRESSION_BSHUF_ZSTD) j["compression"] = "bszstd"; 
+
+    if (writer_settings.write_mode == JF_WRITE_HDF5) j["write_mode"] = "hdf5";
+    else if (writer_settings.write_mode == JF_WRITE_BINARY) j["write_mode"] = "binary";
+    else if (writer_settings.write_mode == JF_WRITE_ZMQ) j["write_mode"] = "zeromq";
+
+    j["hdf18_compat"] = writer_settings.hdf18_compat?"true":"false";
 
     time_t now;
     time(&now);
@@ -84,6 +94,8 @@ void full_status(nlohmann::json &j) {
     j["state"] = state_to_string();
 }
 
+// Recalculates data collection parameters (summation, number of images, number of frames)
+// TODO: Should check count_time_detector is reasonable
 void update_summation() {
     if (experiment_settings.jf_full_speed) {
         if (experiment_settings.frame_time_detector < FRAME_TIME_FULL_SPEED) experiment_settings.frame_time_detector = FRAME_TIME_FULL_SPEED;
@@ -113,6 +125,7 @@ void update_summation() {
         + experiment_settings.shutter_delay * experiment_settings.ntrigger / experiment_settings.frame_time_detector;
 }
 
+// Set initial parameters
 void default_parameters() {
     experiment_settings.jf_full_speed = false;
     experiment_settings.frame_time_detector = FRAME_TIME_HALF_SPEED;
@@ -126,15 +139,16 @@ void default_parameters() {
     experiment_settings.pedestalG1_frames = 1000;
     experiment_settings.pedestalG2_frames = 1000;
     experiment_settings.conversion_mode = MODE_CONV;
+    experiment_settings.enable_spot_finding = true;    
+    experiment_settings.connect_spots_between_frames = true;
+    experiment_settings.strong_pixel = 3.0;
     
-    writer_settings.write_hdf5 = true;
+    writer_settings.write_mode = JF_WRITE_HDF5;
     writer_settings.images_per_file = 1000;
     writer_settings.nthreads = NCARDS * 8; // Spawn 8 writer threads per card
     writer_settings.timing_trigger = true;
-
-    writer_settings.nlocations = 1;
-    writer_settings.data_location[0] = "/mnt/n2ssd";
-    writer_settings.main_location = "/mnt/n2ssd/";
+    writer_settings.hdf18_compat = false;
+    writer_settings.default_path = "/mnt/n2ssd/";
 
     //These parameters are not changeable at the moment
     writer_connection_settings[0].ib_dev_name = "mlx5_1";
@@ -150,9 +164,14 @@ void default_parameters() {
     update_summation();
 }
 
+// Actions to execute by the detector
 // TODO: Wrong parameters should raise errors
+// TODO: Offer fast measurement mode for test shots - no pedestal G0, just external trigger
 void detector_command(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
-    response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*"); // Necessary for Java Script
+    // For REST calls to be made from browser, two things have to be made:
+    //   - all requests need origin-allow in http header
+    //   - PUT requests require preflight authorization via OPTIONS request (see below)
+    response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
 
     // State is locked, so one cannot run two PUT commands at the same time
     pthread_mutex_lock(&daq_state_mutex);
@@ -196,6 +215,7 @@ void detector_command(const Pistache::Rest::Request& request, Pistache::Http::Re
 void detector_set(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
     response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
 
+    // only one PUT command at the time
     pthread_mutex_lock(&daq_state_mutex);
 
     if (daq_state != STATE_READY) {
@@ -224,6 +244,10 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
 
     else if (variable == "beamline_delay") experiment_settings.beamline_delay = json_input["value"].get<float>();
     else if (variable == "shutter_delay") experiment_settings.shutter_delay = json_input["value"].get<float>();
+
+    else if (variable == "strong_pixel") experiment_settings.strong_pixel = json_input["value"].get<float>();
+    else if (variable == "connect_spots_between_frames") experiment_settings.connect_spots_between_frames = json_input["value"].get<bool>();
+    else if (variable == "enable_spot_finding") experiment_settings.enable_spot_finding = json_input["value"].get<bool>();
 
     else if (variable == "compression") {
         if (json_input["value"].get<std::string>() == "bslz4") writer_settings.compression = JF_COMPRESSION_BSHUF_LZ4;
@@ -277,6 +301,8 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
     response.send(Pistache::Http::Code::Ok, json_output.dump(), MIME(Application, Json));
 }
 
+// Detector get is not protected with mutex - it will always return detector parameters
+// But might be out of sync
 void detector_get(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
     response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
     if (daq_state == STATE_NOT_INITIALIZED) {
@@ -310,12 +336,16 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
     else if (variable == "roi_mode") {j["value"] = "disabled"; j["value_type"] = "string"; j["allowed_values"] ={"disabled"};}
     else if (variable == "frame_time") {j["value"] = experiment_settings.frame_time; j["value_type"] = "float"; j["unit"] ={"s"};}
     else if (variable == "count_time") {j["value"] = experiment_settings.count_time; j["value_type"] = "float"; j["unit"] ={"s"};}
-    else if (variable == "frame_time_detector") {j["value"] = experiment_settings.frame_time_detector; j["value_type"] = "float"; j["unit"] ={"s"};}
-    else if (variable == "count_time_detector") {j["value"] = experiment_settings.count_time_detector; j["value_type"] = "float"; j["unit"] ={"s"};}
 
     // JF specific
+    else if (variable == "frame_time_detector") {j["value"] = experiment_settings.frame_time_detector; j["value_type"] = "float"; j["unit"] ={"s"};}
+    else if (variable == "count_time_detector") {j["value"] = experiment_settings.count_time_detector; j["value_type"] = "float"; j["unit"] ={"s"};}
     else if (variable == "beamline_delay") {j["value"] = experiment_settings.beamline_delay; j["value_type"] = "float"; j["unit"] = "s";}
     else if (variable == "shutter_delay") {j["value"] = experiment_settings.shutter_delay; j["value_type"] = "float"; j["unit"] = "s";}
+    else if (variable == "strong_pixel") {j["value"] = experiment_settings.strong_pixel; j["value_type"] = "float";}
+    else if (variable == "connect_spots_between_frames") {j["value"] = experiment_settings.connect_spots_between_frames?"true":"false"; j["value_type"] = "bool";}
+    else if (variable == "enable_spot_finding") {j["value"] = experiment_settings.enable_spot_finding?"true":"false"; j["value_type"] = "bool";}
+
     else if (variable == "pedestalG0_frames") {j["value"] = experiment_settings.pedestalG0_frames; j["value_type"] = "uint";}
     else if (variable == "pedestalG1_frames") {j["value"] = experiment_settings.pedestalG1_frames; j["value_type"] = "uint";}
     else if (variable == "pedestalG2_frames") {j["value"] = experiment_settings.pedestalG2_frames; j["value_type"] = "uint";}
@@ -343,7 +373,7 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
          response.send(Pistache::Http::Code::Ok, (char *) gain_pedestal.pedeG2, NCARDS * NPIXEL * sizeof(uint16_t), MIME(Application, OctetStream));
          return;
     } else if (variable == "keys") {
-         j = {"wavelength" , "photon_energy", "frame_time", "count_time", "frame_time_detector", "count_time_detector", "beamline_delay", "shutter_delay"};
+         j = {"wavelength"}; // TODO: Make better mechanism to handle this
     } else {
 	 response.send(Pistache::Http::Code::Not_Found, "Key " + variable + " doesn't exists");
          return;
@@ -351,6 +381,9 @@ void detector_get(const Pistache::Rest::Request& request, Pistache::Http::Respon
 
     response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));
 }
+
+
+// TODO: As filewriter settings don't overlap with detector settings, these could be merged.
 
 void filewriter_set(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
     response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
@@ -369,15 +402,16 @@ void filewriter_set(const Pistache::Rest::Request& request, Pistache::Http::Resp
 
     if (variable == "nimages_per_file") writer_settings.images_per_file = json_input["value"].get<int>();
     else if (variable == "name_pattern") writer_settings.HDF5_prefix = json_input["value"].get<std::string>();
-    else if (variable == "compression_enabled");
-    else if (variable == "format") { 
-        if (json_input["value"].get<std::string>() == "binary") writer_settings.write_hdf5 = false;
-        if (json_input["value"].get<std::string>() == "hdf5") writer_settings.write_hdf5 = true;
+    else if (variable == "compression_enabled"); // This is purely for compatibility with EIGER
+    else if (variable == "write_mode") { 
+        if (json_input["value"].get<std::string>() == "binary") writer_settings.write_mode = JF_WRITE_BINARY;
+        else if (json_input["value"].get<std::string>() == "hdf5") writer_settings.write_mode = JF_WRITE_HDF5;
+        else if (json_input["value"].get<std::string>() == "zmq") writer_settings.write_mode = JF_WRITE_ZMQ;
+    else if (variable == "hdf18_compat") writer_settings.hdf18_compat = json_input["value"].get<bool>();
     } else {
 	 response.send(Pistache::Http::Code::Not_Found, "Key " + variable + " doesn't exists");
          return;
     }
-
     pthread_mutex_unlock(&daq_state_mutex);
     response.send(Pistache::Http::Code::Ok, json_output.dump(), MIME(Application, Json));
 }
@@ -429,7 +463,7 @@ void full_detector_state(const Pistache::Rest::Request& request, Pistache::Http:
     response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));
 }
 
-// This is required for PUT REST calls to be made from JavaScript in a web browser
+// HTTP preflight authorization is required for PUT REST calls to be made from JavaScript in a web browser (cross-origin)
 void allow(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
     response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
     response.headers().add<Pistache::Http::Header::AccessControlAllowMethods>("PUT");

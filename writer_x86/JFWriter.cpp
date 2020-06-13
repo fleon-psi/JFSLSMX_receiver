@@ -79,7 +79,7 @@ int jfwriter_start() {
 #endif
         if (writer_settings.HDF5_prefix != "")
             if (open_master_hdf5()) return 1;;
-        if (writer_settings.write_hdf5 == true)
+        if (writer_settings.write_mode == JF_WRITE_HDF5)
             if (open_data_hdf5()) return 1;
 
         writer = (pthread_t *) calloc(writer_settings.nthreads, sizeof(pthread_t));
@@ -125,7 +125,7 @@ int jfwriter_stop() {
 
         // Data files can be closed, when all frames were written,
         // even if collection is still running
-        if (writer_settings.write_hdf5 == true)
+        if (writer_settings.write_mode == JF_WRITE_HDF5)
             close_data_hdf5();
 
         // Record end time, as time when everything has ended

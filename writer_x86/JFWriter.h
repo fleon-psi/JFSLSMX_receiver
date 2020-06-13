@@ -41,20 +41,20 @@
 #define PEDESTAL_TIME_CUTOFF (60*60) // collect pedestal every 1 hour
 
 enum compression_t {JF_COMPRESSION_NONE, JF_COMPRESSION_BSHUF_LZ4, JF_COMPRESSION_BSHUF_ZSTD};
+enum write_mode_t  {JF_WRITE_HDF5, JF_WRITE_BINARY, JF_WRITE_ZMQ};
 
 // Settings only necessary for writer
 struct writer_settings_t {
-	std::string HDF5_prefix;
-	int images_per_file;
-	int nthreads;
-	int nlocations;
-	std::string data_location[256];
-	std::string main_location;
-        compression_t compression; 
-        bool write_hdf5;
-        size_t elem_size;
-        bool timing_trigger;
+	std::string default_path;   // Main location in the file system, where all files are placed
+	std::string HDF5_prefix;    // Files are saved in default_path + "/" + HDF5_prefix + "_master.h5" and "_data.h5" 
+	int images_per_file;        // Images saved in a single file
+	int nthreads;               // Number of threads per card
+        compression_t compression;  // Compression
+        write_mode_t write_mode;    // Writing mode
+        bool timing_trigger;        // Timing mode (true = external triger, false = internal trigger)
+        bool hdf18_compat;          // True = (compatibility with HDF5 1.8), False = (use SWMR and VDS)
 };
+
 extern writer_settings_t writer_settings;
 
 struct writer_connection_settings_t {
@@ -73,8 +73,6 @@ struct writer_thread_arg_t {
 	uint16_t card_id;
 };
 
-void *writer_thread(void* threadArg);
-
 struct gain_pedestal_t {
 	uint16_t gainG0[NCARDS*NPIXEL];
 	uint16_t gainG1[NCARDS*NPIXEL];
@@ -84,6 +82,8 @@ struct gain_pedestal_t {
 	uint16_t pedeG0[NCARDS*NPIXEL];
         uint16_t pixel_mask[NCARDS*NPIXEL];
 };
+
+void *writer_thread(void* threadArg);
 
 extern pthread_t *writer;
 extern writer_thread_arg_t *writer_thread_arg;

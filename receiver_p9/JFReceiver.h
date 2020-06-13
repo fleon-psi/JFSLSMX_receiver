@@ -48,7 +48,6 @@ struct receiver_settings_t {
 	std::string gain_file_name[NMODULES];
 	std::string pedestal_file_name;
 	std::string ib_dev_name;
-        bool use_gpu;
         int gpu_device;
 };
 extern receiver_settings_t receiver_settings;

@@ -120,6 +120,7 @@ void *writer_thread(void* thread_arg) {
                 char *output_buffer;
                 size_t output_size;
 
+                // Compress
                 switch(writer_settings.compression) {                   
                     case JF_COMPRESSION_NONE:
                         // If there is no compression, data are saved directly from the buffer
@@ -145,11 +146,16 @@ void *writer_thread(void* thread_arg) {
                         output_buffer = compression_buffer;
                         break;       
                 }
-
-                if (writer_settings.write_hdf5)
-       	       	     save_data_hdf(output_buffer, output_size, frame_id, card_id);
-       	       	else 
-		     save_binary(output_buffer, output_size, frame_id, card_id);
+        
+                // Save file according to chosen method
+                switch (writer_settings.write_mode) {
+                    case JF_WRITE_HDF5:
+       	       	        save_data_hdf(output_buffer, output_size, frame_id, card_id);
+                        break;
+                    case JF_WRITE_BINARY:
+		        save_binary(output_buffer, output_size, frame_id, card_id);
+                        break;
+                }
 
                 local_compressed_size += output_size;
 

@@ -640,9 +640,9 @@ int write_data_files_links() {
 
 int open_master_hdf5() {
 	std::string filename = "";
-	if (writer_settings.main_location != "") { 
+	if (writer_settings.default_path != "") { 
              filename =
-			writer_settings.main_location + "/" +
+			writer_settings.default_path + "/" +
 			writer_settings.HDF5_prefix + "_master.h5";
         }
 	else filename = writer_settings.HDF5_prefix + "_master.h5";
@@ -651,10 +651,15 @@ int open_master_hdf5() {
 
         // Set to use the latest library format
         master_file_fapl = H5Pcreate(H5P_FILE_ACCESS);
-        H5Pset_libver_bounds(master_file_fapl, H5F_LIBVER_LATEST, H5F_LIBVER_LATEST); 
+
+        // Restrict to current library version, if compatibility is not necessary
+        if (!writer_settings.hdf18_compat)
+           H5Pset_libver_bounds(master_file_fapl, H5F_LIBVER_LATEST, H5F_LIBVER_LATEST); 
+
+        // File is opened without SWMR, as metadata need to be consistently written
+	master_file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, master_file_fapl);
 
 	// Create Master file
-	master_file_id = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC|H5F_ACC_SWMR_WRITE, H5P_DEFAULT, master_file_fapl);
 	if (master_file_id < 0) {
 		std::cerr << "Cannot create file: " << filename << std::endl;
 		return 1;
@@ -688,6 +693,10 @@ int open_master_hdf5() {
         write_detector_parameters();
         write_data_files_links();
         write_metrology();
+
+        // After metadata are written, SWMR is enabled to keep the file open + accessible
+        if (!writer_settings.hdf18_compat)
+            H5Fstart_swmr_write(master_file_id);
 	return 0;
 }
 
@@ -729,17 +738,21 @@ int open_data_hdf5() {
     int32_t frames = experiment_settings.nimages_to_write;
 
     std::string filename = "";
-    if (writer_settings.main_location != "") filename =
-                        writer_settings.main_location + "/" +
+    if (writer_settings.default_path != "") filename =
+                        writer_settings.default_path + "/" +
                         writer_settings.HDF5_prefix + "_data.h5";
     else filename = writer_settings.HDF5_prefix + "_data.h5";
 
     // Need to ensure that only newest library can write into this file
     data_hdf5_fapl = H5Pcreate(H5P_FILE_ACCESS);
-    H5Pset_libver_bounds(data_hdf5_fapl, H5F_LIBVER_LATEST, H5F_LIBVER_LATEST);
+    if (!writer_settings.hdf18_compat) {
+        H5Pset_libver_bounds(data_hdf5_fapl, H5F_LIBVER_LATEST, H5F_LIBVER_LATEST);
     
-    // Create data file with SWMR flag
-    data_hdf5 = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC|H5F_ACC_SWMR_WRITE, H5P_DEFAULT, data_hdf5_fapl);
+        // Create data file with SWMR flag
+        data_hdf5 = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC|H5F_ACC_SWMR_WRITE, H5P_DEFAULT, data_hdf5_fapl);
+    } else {
+        data_hdf5 = H5Fcreate(filename.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, data_hdf5_fapl);
+    }
     if (data_hdf5 < 0) {
 		std::cerr << "Cannot create file: " << filename << std::endl;
 		return 1;
@@ -852,8 +865,8 @@ int save_binary(char *data, size_t size, int frame_id, int thread_id) {
         char buff[12];
         snprintf(buff,12,"%08d_%01d", frame_id, thread_id);
         std::string prefix = "";
-        if (writer_settings.nlocations > 0)
-                prefix = writer_settings.data_location[frame_id % writer_settings.nlocations] + "/";
+        if (writer_settings.default_path != "")
+                prefix = writer_settings.default_path + "/";
         std::string filename = prefix + writer_settings.HDF5_prefix+"_"+std::string(buff) + ".img";
         std::ofstream out_file(filename.c_str(), std::ios::binary | std::ios::out);
         if (!out_file.is_open()) return 1;
