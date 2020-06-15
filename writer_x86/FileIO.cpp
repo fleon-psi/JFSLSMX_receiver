@@ -201,6 +201,36 @@ int saveDouble1D(hid_t location, std::string name, const double *val, std::strin
     return 0;
 }
 
+int saveDouble2D(hid_t location, std::string name, const double *val, std::string units, int dim1, int dim2) {
+    herr_t status;
+    
+    // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
+    hsize_t dims[2];
+    dims[0] = dim1;
+    dims[1] = dim2;
+
+    /* Create the data space for the dataset. */
+    hid_t dataspace_id = H5Screate_simple(2, dims, NULL);
+    
+    /* Create the dataset. */
+    hid_t dataset_id = H5Dcreate2(location, name.c_str(), H5T_IEEE_F32LE, dataspace_id,
+                                  H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    
+    /* Write the dataset. */
+    status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+                      val);
+    
+    if (units != "") addStringAttribute(dataset_id, "units", units);
+    
+    /* End access to the dataset and release resources used by it. */
+    status = H5Dclose(dataset_id);
+    
+    /* Terminate access to the data space. */
+    status = H5Sclose(dataspace_id);
+    
+    return 0;
+}
+
 int saveUInt2D(hid_t location, std::string name, const uint32_t *val, std::string units, int dim1, int dim2) {
     herr_t status;
     
@@ -638,6 +668,25 @@ int write_data_files_links() {
         return 0;
 }
 
+int write_spots() {
+	hid_t grp = createGroup(master_file_id, "/entry/processing","NXcollection");
+        
+        double *tmp = (double *) calloc(6*spots.size(),sizeof(double));
+        for (int i = 0; i < spots.size(); i++) {
+            tmp[i*6]   = spots[i].x;
+            tmp[i*6+1] = spots[i].y;
+            tmp[i*6+2] = spots[i].z;
+            tmp[i*6+3] = spots[i].photons;
+            tmp[i*6+4] = spots[i].pixels;
+            tmp[i*6+5] = spots[i].depth;
+        }
+
+        saveDouble2D(grp, "spots", tmp, "", spots.size(), 6);
+        free(tmp);
+	H5Gclose(grp);
+        return 0;
+}
+
 int open_master_hdf5() {
 	std::string filename = "";
 	if (writer_settings.default_path != "") { 
@@ -726,6 +775,8 @@ int close_master_hdf5() {
     saveUInt16_3D(grp, "G1", gain_pedestal.pedeG1, 1024, 512, NMODULES * NCARDS, 0.25);
     saveUInt16_3D(grp, "G2", gain_pedestal.pedeG2, 1024, 512, NMODULES * NCARDS, 0.25);
     H5Gclose(grp);
+
+    if (experiment_settings.enable_spot_finding) write_spots();
 
     H5Fclose(master_file_id);
     H5Pclose(master_file_fapl);

@@ -203,11 +203,22 @@ int disconnect_from_power9(int card_id) {
         tcp_receive(writer_connection_settings[card_id].sockfd,
                     (char *) (gain_pedestal.pixel_mask + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
         
-        // Send spots found by spot finder
+        // Receive spots found by spot finder
         size_t spot_data_size;
         tcp_receive(writer_connection_settings[card_id].sockfd,(char *) &spot_data_size, sizeof(size_t));
-        std::vector<spot_t> spots(spot_data_size);
-        tcp_receive(writer_connection_settings[card_id].sockfd, (char *) spots.data(), spot_data_size * sizeof(spot_t));
+        std::cout << "Spot data size " << spot_data_size << std::endl;
+        
+        std::vector<spot_t> local_spots(spot_data_size);
+        if (spot_data_size > 0)
+            tcp_receive(writer_connection_settings[card_id].sockfd, (char *) local_spots.data(), spot_data_size * sizeof(spot_t));
+
+        // Merge spots with the global list
+        // This could be later done in an online manner, so I keep mutex
+        // Although in current scenario it is likely not necessary
+        pthread_mutex_lock(&spots_mutex);
+        for (int i = 0; i < spot_data_size; i++)
+            spots.push_back(local_spots[i]);
+        pthread_mutex_unlock(&spots_mutex);
 
 	// Check magic number again - but don't quit, as the program is finishing anyway soon
 	exchange_magic_number(writer_connection_settings[card_id].sockfd);
