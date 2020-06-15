@@ -299,6 +299,7 @@ int main(int argc, char **argv) {
 		std::cout << "Bogus TCP/IP connection" << std::endl;
 
 	   // Receive experimental settings via TCP/IP
+           // TODO: Check size of received data
 	   read(accepted_socket, &experiment_settings, sizeof(experiment_settings_t));
            if (experiment_settings.conversion_mode == 255) {
               std::cout << "Exiting" << std::endl;
@@ -318,6 +319,7 @@ int main(int argc, char **argv) {
            std::cout << "Energy: " << experiment_settings.energy_in_keV << " keV" << std::endl;
            std::cout << "Images to write: " << experiment_settings.nimages_to_write << std::endl;
            std::cout << "Summation: " << experiment_settings.summation << std::endl;
+           std::cout << "Spot finding enabled: " << experiment_settings.enable_spot_finding << std::endl;
 
            memset(ib_buffer_occupancy, 0, RDMA_SQ_SIZE * sizeof(uint16_t));
 

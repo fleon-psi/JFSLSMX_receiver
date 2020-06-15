@@ -20,6 +20,7 @@
 // TODO - this should be in common header
 #define COLS (2*1030L)
 #define LINES (514L)
+#define NCARDS 2
 
 // modules are stacked two vertically
 // 67 (modules 6 and 7)
@@ -199,108 +200,119 @@ int close_gpu() {
 // Constructing spot from strong pixels
 
 // Adds two spot measurements
-void merge_spots(spot_t &spot1, const spot_t &spot2) {
-    if (spot2.photons > 0) {
+void merge_spots(spot_t &spot1, const spot_t spot2) {
         spot1.x = spot1.x + spot2.x;
         spot1.y = spot1.y + spot2.y;
         spot1.z = spot1.z + spot2.z;
         spot1.photons = spot1.photons + spot2.photons;
         spot1.pixels = spot1.pixels + spot2.pixels;
-    }
 }
 
 // If spots come from two different frames, depth needs to be incremented
-void merge_spots_new_frame(spot_t &spot1, const spot_t &spot2) {
-    if (spot2.photons > 0) {
+void merge_spots_new_frame(spot_t &spot1, const spot_t spot2) {
         spot1.x = spot1.x + spot2.x;
         spot1.y = spot1.y + spot2.y;
         spot1.z = spot1.z + spot2.z;
         spot1.photons = spot1.photons + spot2.photons;
         spot1.pixels = spot1.pixels + spot2.pixels;
         spot1.depth = spot1.depth + spot2.depth + 1;
-    }
 }
 
-typedef std::pair<int16_t, int16_t> coordxy;
+typedef std::pair<int16_t, int16_t> coordxy_t; // This is simply (x, y)
+typedef std::map<coordxy_t, uint64_t> strong_pixel_map_t;
+// This is mapping (x,y) --> intensity
+// it allows to find if there is spot in (x,y) in log time
+typedef std::vector<strong_pixel_map_t> strong_pixel_maps_t;
+// There is one map per 1/2 frame
 
 // Creates a continous spot
 // strong pixels are loaded into dictionary (one dictionary per frame)
 // and routine checks if neighboring pixels are also in dictionary (likely in log(N) time)
-spot_t add_pixel(std::map<coordxy, uint64_t> *dictionary, uint64_t frame, uint16_t module, int16_t line, int16_t col, bool connect_frames) {
+spot_t add_pixel(strong_pixel_maps_t &strong_pixel_maps, size_t i, strong_pixel_map_t::iterator &it, bool connect_frames) {
     spot_t ret_value;
-    ret_value.photons = 0;
-    ret_value.pixels = 0;
 
-    if ((line >= 0) && (col >= 0)) {
-      std::map<coordxy, uint64_t>::iterator iterator = dictionary[frame*NIMAGES_PER_STREAM+module].find(coordxy(line,col));
-      if (iterator != dictionary[frame*NIMAGES_PER_STREAM+module].end()) {
-        uint64_t photons = iterator->second;
-        ret_value.module = module + (NMODULES / 2) * receiver_settings.card_number; // returned module number takes into account which card is this one
-        ret_value.x = line * (double)photons; // position is weighted by number of photon counts
-        ret_value.y = col * (double)photons;
-        ret_value.z = frame * (double)photons;
-        ret_value.photons = photons;
-        ret_value.pixels = 1;
-        ret_value.depth = 0;
+    uint64_t photons = it->second;
+    int16_t col = it->first.first;
+    int16_t line = it->first.second;
 
-        dictionary[frame*NIMAGES_PER_STREAM+module].erase(iterator); // Remove strong pixel from the dictionary, so it is not processed again
+    strong_pixel_maps[i].erase(it); // Remove strong pixel from the dictionary, so it is not processed again
 
-        // Recursively analyze all neighbors 
-        merge_spots(ret_value, add_pixel(dictionary, frame, module, line+1, col-1, connect_frames));
-        merge_spots(ret_value, add_pixel(dictionary, frame, module, line+1, col, connect_frames));
-        merge_spots(ret_value, add_pixel(dictionary, frame, module, line+1, col+1, connect_frames));
-        merge_spots(ret_value, add_pixel(dictionary, frame, module, line-1, col-1, connect_frames));
-        merge_spots(ret_value, add_pixel(dictionary, frame, module, line-1, col, connect_frames));
-        merge_spots(ret_value, add_pixel(dictionary, frame, module, line-1, col+1, connect_frames));
-        merge_spots(ret_value, add_pixel(dictionary, frame, module, line, col+1, connect_frames));
-        merge_spots(ret_value, add_pixel(dictionary, frame, module, line, col-1, connect_frames));
-        // Recursively check if spot in next frame is also strong
-        if (connect_frames && (frame + 1 < NIMAGES_PER_STREAM)) merge_spots_new_frame(ret_value, add_pixel(dictionary, frame + 1, module, line, col, connect_frames));
-      }
+    ret_value.x = col * (double)photons; // position is weighted by number of photon counts
+    ret_value.y = (line + (i%2) * LINES) * (double)photons;
+    // Y accounts for the actual module
+    ret_value.z = (i / 2) * (double)photons;
+    ret_value.photons = photons;
+    ret_value.pixels = 1;
+    ret_value.depth = 0;
+
+    strong_pixel_map_t::iterator it2;
+
+    if ((it2 = strong_pixel_maps[i].find(coordxy_t(col-1, line  ))) != strong_pixel_maps[i].end())
+        merge_spots(ret_value, add_pixel(strong_pixel_maps, i, it2, connect_frames));
+
+    if ((it2 = strong_pixel_maps[i].find(coordxy_t(col-1, line+1))) != strong_pixel_maps[i].end())
+        merge_spots(ret_value, add_pixel(strong_pixel_maps, i, it2, connect_frames));
+
+    if ((it2 = strong_pixel_maps[i].find(coordxy_t(col-1, line-1))) != strong_pixel_maps[i].end())
+        merge_spots(ret_value, add_pixel(strong_pixel_maps, i, it2, connect_frames));
+
+    if ((it2 = strong_pixel_maps[i].find(coordxy_t(col+1, line  ))) != strong_pixel_maps[i].end())
+        merge_spots(ret_value, add_pixel(strong_pixel_maps, i, it2, connect_frames));
+
+    if ((it2 = strong_pixel_maps[i].find(coordxy_t(col+1, line-1))) != strong_pixel_maps[i].end())
+        merge_spots(ret_value, add_pixel(strong_pixel_maps, i, it2, connect_frames));
+
+    if ((it2 = strong_pixel_maps[i].find(coordxy_t(col+1, line+1))) != strong_pixel_maps[i].end())
+        merge_spots(ret_value, add_pixel(strong_pixel_maps, i, it2, connect_frames));
+
+    if ((it2 = strong_pixel_maps[i].find(coordxy_t(col  , line-1))) != strong_pixel_maps[i].end())
+        merge_spots(ret_value, add_pixel(strong_pixel_maps, i, it2, connect_frames));
+
+    if ((it2 = strong_pixel_maps[i].find(coordxy_t(col  , line+1))) != strong_pixel_maps[i].end())
+        merge_spots(ret_value, add_pixel(strong_pixel_maps, i, it2, connect_frames));
+
+    if (connect_frames && (i + 2 < strong_pixel_maps.size())) {
+        if ((it2 = strong_pixel_maps[i+2].find(coordxy_t(col  , line))) != strong_pixel_maps[i+2].end())
+            merge_spots_new_frame(ret_value, add_pixel(strong_pixel_maps, i+2, it2, connect_frames));
     }
     return ret_value;
-
 }
 
-// Gather spots
-void process_frames(std::map<coordxy, uint64_t> *dictionary, std::vector<spot_t> &spots, bool connect_frames) {
-   for (int i = 0; i < NIMAGES_PER_STREAM*2; i++) {
-      std::map<coordxy, uint64_t>::iterator iterator = dictionary[i].begin();
-      while (iterator != dictionary[i].end()) {
-          // Frame number is i / 2
-          // Module number is i % 2
-          spot_t spot = add_pixel(dictionary, i / 2, i % 2, iterator->first.first, iterator->first.second, connect_frames);
-
-          // Apply pixel count cut-off and cut-off of number of frames, which spot can span 
-          // (spots present in most frames, are likely to be either bad pixels or in spindle axis)
-          if ((spot.pixels > 3) && (spot.depth < 100)) spots.push_back(spot);
-          iterator = dictionary[i].begin(); // Get first unprocessed spot in this frame
-      }
-   }
-}
-
-void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool connect_frames = true) {
+void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool connect_frames, size_t images, size_t image0) {
     // key is location of strong pixel - value is number of photons
-    std::map<coordxy, uint64_t> dictionary[NIMAGES_PER_STREAM*2]; 
+    // there is one mpa per fragment analyzed by GPU (2 horizontally connected modules)
+    strong_pixel_maps_t strong_pixel_maps = strong_pixel_maps_t(images*2); 
 
-    int tmp = 0;
     // Transfer strong pixels into dictionary
-    for (size_t i = 0; i < NIMAGES_PER_STREAM*2; i++) {
+    for (size_t i = 0; i < images*2; i++) {
         size_t addr = i * MAX_STRONG;
         int k = 0;
         // There is maximum MAX_STRONG pixels
         // GPU kernel sets col to -1 for next element after last strong pixel
         // Photons equal zero could mean that kernel was not at all executed
-        while ((k < MAX_STRONG) && (host_out[addr + k].col >= 0) && (host_out[addr+k].photons > 0)) {
-              coordxy key = coordxy(host_out[addr + k].line, host_out[addr + k].col);
-              (dictionary[i])[key] = host_out[addr + k].photons;
+        while ((k < MAX_STRONG) && (host_out[addr + k].col >= 0) && (host_out[addr + k].line >= 0) && (host_out[addr+k].photons > 0)) {
+              coordxy_t key = coordxy_t(host_out[addr + k].col, host_out[addr + k].line);
+              strong_pixel_maps[i][key] = host_out[addr + k].photons;
               k++;
         }
-        tmp += k;
     }
-    std::cout << "strong pixel " << tmp << std::endl;
-    // TODO: There is segfault in process frames (why?)
-    process_frames(dictionary,spots, connect_frames);
+
+    for (int i = 0; i < images*2; i++) {
+      strong_pixel_map_t::iterator iterator = strong_pixel_maps[i].begin();
+      while (iterator != strong_pixel_maps[i].end()) {
+          spot_t spot = add_pixel(strong_pixel_maps, i, iterator, connect_frames);
+          // Apply pixel count cut-off and cut-off of number of frames, which spot can span 
+          // (spots present in most frames, are likely to be either bad pixels or in spindle axis)
+          spot.x = spot.x / spot.photons;
+          // Account for the fact, that each process handles only part of the detector
+          spot.y = spot.y / spot.photons + (NCARDS - receiver_settings.card_number - 1) * 2 * LINES;
+          // Account for frame number
+          spot.z = spot.z / spot.photons + image0;
+//          spots.push_back(spot);
+          if ((spot.pixels > 3) && (spot.depth < 100)) spots.push_back(spot);
+          iterator = strong_pixel_maps[i].begin(); // Get first unprocessed spot in this frame
+      }
+    }
 }
 
 void *run_gpu_thread(void *in_threadarg) {
@@ -323,8 +335,6 @@ void *run_gpu_thread(void *in_threadarg) {
 
     strong_pixel *host_out = (strong_pixel *) calloc(NIMAGES_PER_STREAM * 2 * MAX_STRONG, sizeof(strong_pixel));
 
-    std::cout << "GPU: Thread "<< arg->ThreadID << " started. Chunks to go: " << total_chunks << std::endl;
-
     for (size_t chunk = gpu_slice;
          chunk < total_chunks;
          chunk += NCUDA_STREAMS) {
@@ -332,8 +342,8 @@ void *run_gpu_thread(void *in_threadarg) {
          size_t ib_slice = chunk % (NCUDA_STREAMS*CUDA_TO_IB_BUFFER);
 
 //         size_t frame0 = ib_slice * NIMAGES_PER_STREAM;
-         size_t frames = experiment_settings.nimages_to_write - gpu_slice * NIMAGES_PER_STREAM;
-         if (frames > NIMAGES_PER_STREAM) frames = NIMAGES_PER_STREAM;
+         size_t images = experiment_settings.nimages_to_write - gpu_slice * NIMAGES_PER_STREAM;
+         if (images > NIMAGES_PER_STREAM) images = NIMAGES_PER_STREAM;
 
          pthread_mutex_lock(writer_threads_done_mutex+ib_slice);
          // Wait till everyone is done
@@ -350,10 +360,10 @@ void *run_gpu_thread(void *in_threadarg) {
          cudaError_t err;
          err = cudaMemcpyAsync(gpu_data16 + (gpu_slice % NCUDA_STREAMS) * NIMAGES_PER_STREAM * FRAME_SIZE / sizeof(uint16_t), 
                ib_buffer + ib_slice * NIMAGES_PER_STREAM * FRAME_SIZE,
-               frames * FRAME_SIZE,
+               images * FRAME_SIZE,
                cudaMemcpyHostToDevice, stream[gpu_slice]);
          if (err != cudaSuccess) {
-             std::cout << "GPU: memory copy error for slice " << gpu_slice << "/" << ib_slice << "frames: " << frames << "(" << cudaGetErrorString(err) << ")" << std::endl;
+             std::cerr << "GPU: memory copy error for slice " << gpu_slice << "/" << ib_slice << "frames: " << images << "(" << cudaGetErrorString(err) << ")" << std::endl;
              pthread_exit(0);
          }
 
@@ -364,12 +374,12 @@ void *run_gpu_thread(void *in_threadarg) {
          find_spots_colspot<int16_t> <<<NIMAGES_PER_STREAM * 2 / 32, 32, 0, stream[gpu_slice]>>> 
                  (gpu_data16 + gpu_slice * NIMAGES_PER_STREAM * FRAME_SIZE / 2, 
                   gpu_out + gpu_slice * NIMAGES_PER_STREAM * 2 * MAX_STRONG, 
-                  experiment_settings.strong_pixel, frames * 2);
+                  experiment_settings.strong_pixel, images * 2);
 
          // After data are copied, one can release buffer
          err = cudaEventSynchronize(event_mem_copied);
          if (err != cudaSuccess) {
-             std::cout << "GPU: memory copy error" << std::endl;
+             std::cerr << "GPU: memory copy error" << std::endl;
              pthread_exit(0);
          }
 
@@ -382,17 +392,18 @@ void *run_gpu_thread(void *in_threadarg) {
          // Ensure kernel has finished
          err = cudaStreamSynchronize(stream[gpu_slice]);
          if (err != cudaSuccess) {
-             std::cout << "GPU: execution error" << std::endl;
+             std::cerr << "GPU: execution error" << std::endl;
              pthread_exit(0);
          }
 
+         // Copy result back to host memory
          err = cudaMemcpy(host_out, 
                          gpu_out + gpu_slice * NIMAGES_PER_STREAM * 2 * MAX_STRONG,
-                         NIMAGES_PER_STREAM * 2 * MAX_STRONG * sizeof(strong_pixel),
+                         images * 2 * MAX_STRONG * sizeof(strong_pixel),
                          cudaMemcpyDeviceToHost);
 
          // Analyze results to find spots
-         analyze_spots(host_out, spots, experiment_settings.connect_spots_between_frames);
+         analyze_spots(host_out, spots, experiment_settings.connect_spots_between_frames, images, chunk * NIMAGES_PER_STREAM);
     }
     cudaEventDestroy (event_mem_copied);
 
@@ -402,7 +413,7 @@ void *run_gpu_thread(void *in_threadarg) {
         all_spots.push_back(spots[i]);
     pthread_mutex_unlock(&all_spots_mutex);
 
-    std::cout << "GPU: Thread "<< arg->ThreadID << " done" << std::endl;
+//    std::cout << "GPU: Thread "<< arg->ThreadID << " done" << std::endl;
     pthread_exit(0);
 }
 
