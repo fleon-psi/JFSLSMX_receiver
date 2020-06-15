@@ -225,6 +225,8 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
     }
 
     std::string variable = request.param(":variable").as<std::string>();
+
+    try {
     nlohmann::json json_input = nlohmann::json::parse(request.body());
     nlohmann::json json_output;
 
@@ -292,6 +294,7 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
     else if (variable == "pedestalG1_frames") {experiment_settings.pedestalG1_frames = json_input["value"].get<int>(); time_pedestalG1.tv_sec = 0;}
     else if (variable == "pedestalG2_frames") {experiment_settings.pedestalG2_frames = json_input["value"].get<int>(); time_pedestalG2.tv_sec = 0;}
     else {
+         pthread_mutex_unlock(&daq_state_mutex);
 	 response.send(Pistache::Http::Code::Not_Found, "Key " + variable + " doesn't exists");
          return;
     }
@@ -299,6 +302,10 @@ void detector_set(const Pistache::Rest::Request& request, Pistache::Http::Respon
     pthread_mutex_unlock(&daq_state_mutex);
 
     response.send(Pistache::Http::Code::Ok, json_output.dump(), MIME(Application, Json));
+    } catch (nlohmann::json::parse_error) {
+         pthread_mutex_unlock(&daq_state_mutex);
+	 response.send(Pistache::Http::Code::Not_Found, "Error in json parser");
+    }
 }
 
 // Detector get is not protected with mutex - it will always return detector parameters
@@ -390,6 +397,7 @@ void filewriter_set(const Pistache::Rest::Request& request, Pistache::Http::Resp
 
     pthread_mutex_lock(&daq_state_mutex);
 
+    try {
     if (daq_state != STATE_READY) {
         response.send(Pistache::Http::Code::Bad_Request);
         pthread_mutex_unlock(&daq_state_mutex);
@@ -409,11 +417,16 @@ void filewriter_set(const Pistache::Rest::Request& request, Pistache::Http::Resp
         else if (json_input["value"].get<std::string>() == "zmq") writer_settings.write_mode = JF_WRITE_ZMQ;
     else if (variable == "hdf18_compat") writer_settings.hdf18_compat = json_input["value"].get<bool>();
     } else {
+         pthread_mutex_lock(&daq_state_mutex);
 	 response.send(Pistache::Http::Code::Not_Found, "Key " + variable + " doesn't exists");
          return;
     }
     pthread_mutex_unlock(&daq_state_mutex);
     response.send(Pistache::Http::Code::Ok, json_output.dump(), MIME(Application, Json));
+    } catch (nlohmann::json::parse_error) {
+         pthread_mutex_unlock(&daq_state_mutex);
+	 response.send(Pistache::Http::Code::Not_Found, "Error in json parser");
+    }
 }
 
 void filewriter_get(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
@@ -454,6 +467,16 @@ void fetch_preview_log(const Pistache::Rest::Request& request, Pistache::Http::R
     auto res = response.send(Pistache::Http::Code::Ok, (char *)jpeg->data(), jpeg->size(), MIME(Image,Jpeg));
     res.then([jpeg](ssize_t bytes) { delete(jpeg);}, Pistache::Async::NoExcept);
     
+}
+
+void fetch_spot_count_per_image(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
+    response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
+
+    pthread_mutex_lock(&spots_statistics_mutex);
+    nlohmann::json j = spot_count_per_image;
+    pthread_mutex_unlock(&spots_statistics_mutex);
+
+    response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));
 }
 
 void full_detector_state(const Pistache::Rest::Request& request, Pistache::Http::ResponseWriter response) {
@@ -503,6 +526,8 @@ int main() {
     // So dummy variable x is added - it is not read, nor parsed, so JS can change it at regular intervals
     Pistache::Rest::Routes::Get(router, "/preview/:variable/:x", Pistache::Rest::Routes::bind(&fetch_preview));
     Pistache::Rest::Routes::Get(router, "/preview_log/:variable/:x", Pistache::Rest::Routes::bind(&fetch_preview_log));
+
+    Pistache::Rest::Routes::Get(router, "/spot_count", Pistache::Rest::Routes::bind(&fetch_spot_count_per_image));
 
     Pistache::Rest::Routes::Get(router, "/", Pistache::Rest::Routes::bind(&full_detector_state));
     

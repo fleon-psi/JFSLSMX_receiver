@@ -38,6 +38,7 @@
 #define PREVIEW_STRIDE (int(PREVIEW_FREQUENCY/experiment_settings.frame_time))
 #define PREVIEW_SIZE (XPIXEL * YPIXEL)
 
+extern pthread_mutex_t spots_statistics;
 #define PEDESTAL_TIME_CUTOFF (60*60) // collect pedestal every 1 hour
 
 enum compression_t {JF_COMPRESSION_NONE, JF_COMPRESSION_BSHUF_LZ4, JF_COMPRESSION_BSHUF_ZSTD};
@@ -106,6 +107,13 @@ extern pthread_mutex_t remaining_images_mutex[NCARDS];
 
 extern std::vector<int32_t> preview;
 //extern pthread_mutex_t preview_mutex; // not protected by mutex at the moment, but might be used in the future
+
+extern std::vector<spot_t> spots;
+extern pthread_mutex_t spots_mutex;
+
+extern std::vector<double> spot_count_per_image;
+extern std::vector<double> spot_intensity_per_resolution;
+extern pthread_mutex_t spots_statistics_mutex;
 
 #ifndef OFFLINE
 extern sls::Detector *det;

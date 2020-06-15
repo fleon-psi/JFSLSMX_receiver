@@ -238,9 +238,24 @@ int jfwriter_arm() {
     }
 
     writer_settings.timing_trigger = true;
+    spots.clear();
     return jfwriter_start();
 }
 
 int jfwriter_disarm() {
-    return jfwriter_stop();
+    int retval = jfwriter_stop();
+
+    // Calculate spots per frame
+    pthread_mutex_lock(&spots_statistics_mutex);
+
+    spot_count_per_image.clear();
+    spot_count_per_image.resize(experiment_settings.nimages_to_write, 0);
+    for (int i = 0; i < spots.size() ; i++) {
+        size_t z = (size_t) spots[i].z;
+        if ((z >= 0) && (z < experiment_settings.nimages_to_write)) 
+            spot_count_per_image[z]++;
+    }
+    pthread_mutex_unlock(&spots_statistics_mutex);
+
+    return retval;
 }

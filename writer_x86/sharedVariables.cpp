@@ -49,5 +49,9 @@ struct timespec time_end = {0, 0};
 std::vector<int32_t> preview(PREVIEW_SIZE);
 // pthread_mutex_t preview_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-std::vector<unsigned char > preview_jpeg;
-pthread_mutex_t preview_jpeg_mutex = PTHREAD_MUTEX_INITIALIZER;
+std::vector<spot_t> spots;
+pthread_mutex_t spots_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+std::vector<double> spot_count_per_image;
+std::vector<double> spot_intensity_per_resolution;
+pthread_mutex_t spots_statistics_mutex;
