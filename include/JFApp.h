@@ -82,11 +82,10 @@ struct ib_settings_t {
 
 // Definition of Bragg spot
 struct spot_t {
-    double x,y,z;
-    uint16_t module; // number of module - it is impossible for spot to belong to more than one module
+    double x,y,z;     // Coordinates in "data" array (not exactly detector configuration)
     uint64_t photons; // total photon count
-    uint64_t pixels; // number of pixels
-    uint64_t depth; // on how many frames the spot is present
+    uint64_t pixels;  // number of pixels
+    uint64_t depth;   // on how many frames the spot is present
 };
 
 // IB Verbs function wrappers
