@@ -1,3 +1,21 @@
+/*
+ * Copyright 2020 Paul Scherrer Institute
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Acknowledgements K. Diederichs (U. Konstanz)
+
 #include <fstream>
 #include <iostream>
 #include <string.h>
@@ -29,7 +47,7 @@
 // 01
 // --> but this part of app cares about four top/bottom modules
 // --> so one chunk will be 67 and another 45 (or resp. 32 and 01)
-#define FRAME_SIZE ((NMODULES/2) * COLS * LINES * sizeof(int16_t))
+#define FRAGMENT_SIZE ((NMODULES/2) * COLS * LINES * sizeof(int16_t))
 
 // CUDA calculation streams
 cudaStream_t stream[NCUDA_STREAMS];
@@ -144,7 +162,7 @@ int setup_gpu(int device) {
     }
 
     // Initialize input memory on GPU
-    size_t gpu_data16_size = NCUDA_STREAMS * NIMAGES_PER_STREAM * FRAME_SIZE;
+    size_t gpu_data16_size = NCUDA_STREAMS * NIMAGES_PER_STREAM * FRAGMENT_SIZE;
     err = cudaMalloc((void **) &gpu_data16, gpu_data16_size);
     if (err != cudaSuccess) {
          std::cerr << "GPU: Mem alloc. error (data) " <<  gpu_data16_size / 1024 / 1024 << std::endl;
@@ -305,7 +323,7 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
           // (spots present in most frames, are likely to be either bad pixels or in spindle axis)
           spot.x = spot.x / spot.photons;
           // Account for the fact, that each process handles only part of the detector
-          spot.y = spot.y / spot.photons + (NCARDS - receiver_settings.card_number - 1) * 2 * LINES;
+          spot.y = spot.y / spot.photons + (NCARDS - receiver_settings.gpu_device - 1) * 2 * LINES;
           // Account for frame number
           spot.z = spot.z / spot.photons + image0;
 //          spots.push_back(spot);
@@ -342,7 +360,7 @@ void *run_gpu_thread(void *in_threadarg) {
          size_t ib_slice = chunk % (NCUDA_STREAMS*CUDA_TO_IB_BUFFER);
 
 //         size_t frame0 = ib_slice * NIMAGES_PER_STREAM;
-         size_t images = experiment_settings.nimages_to_write - gpu_slice * NIMAGES_PER_STREAM;
+         size_t images = experiment_settings.nimages_to_write - chunk * NIMAGES_PER_STREAM;
          if (images > NIMAGES_PER_STREAM) images = NIMAGES_PER_STREAM;
 
          pthread_mutex_lock(writer_threads_done_mutex+ib_slice);
@@ -358,9 +376,9 @@ void *run_gpu_thread(void *in_threadarg) {
 
          // Copy frames to GPU memory
          cudaError_t err;
-         err = cudaMemcpyAsync(gpu_data16 + (gpu_slice % NCUDA_STREAMS) * NIMAGES_PER_STREAM * FRAME_SIZE / sizeof(uint16_t), 
-               ib_buffer + ib_slice * NIMAGES_PER_STREAM * FRAME_SIZE,
-               images * FRAME_SIZE,
+         err = cudaMemcpyAsync(gpu_data16 + gpu_slice * NIMAGES_PER_STREAM * FRAGMENT_SIZE / sizeof(uint16_t), 
+               ib_buffer + ib_slice * NIMAGES_PER_STREAM * FRAGMENT_SIZE,
+               images * FRAGMENT_SIZE,
                cudaMemcpyHostToDevice, stream[gpu_slice]);
          if (err != cudaSuccess) {
              std::cerr << "GPU: memory copy error for slice " << gpu_slice << "/" << ib_slice << "frames: " << images << "(" << cudaGetErrorString(err) << ")" << std::endl;
@@ -372,7 +390,7 @@ void *run_gpu_thread(void *in_threadarg) {
          // Start GPU kernel
          // TODO - handle frame summation
          find_spots_colspot<int16_t> <<<NIMAGES_PER_STREAM * 2 / 32, 32, 0, stream[gpu_slice]>>> 
-                 (gpu_data16 + gpu_slice * NIMAGES_PER_STREAM * FRAME_SIZE / 2, 
+                 (gpu_data16 + gpu_slice * NIMAGES_PER_STREAM * FRAGMENT_SIZE / 2, 
                   gpu_out + gpu_slice * NIMAGES_PER_STREAM * 2 * MAX_STRONG, 
                   experiment_settings.strong_pixel, images * 2);
 
@@ -404,6 +422,8 @@ void *run_gpu_thread(void *in_threadarg) {
 
          // Analyze results to find spots
          analyze_spots(host_out, spots, experiment_settings.connect_spots_between_frames, images, chunk * NIMAGES_PER_STREAM);
+
+         // TODO: send spots by TCP/IP here
     }
     cudaEventDestroy (event_mem_copied);
 
