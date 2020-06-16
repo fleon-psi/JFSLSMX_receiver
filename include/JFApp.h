@@ -34,7 +34,7 @@ struct experiment_settings_t {
         double   frame_time;            // in s Beamline
         double   frame_time_detector;   // in s Detector
 	double   count_time_detector;   // in s Detector
-        size_t   pixel_depth;           // in byte
+        size_t   pixel_depth;           // in byte !! code is only safe for pixe depth of 2 and 4 !!
 
 	double   energy_in_keV;         // in keV
         double   beam_x;                // in pixel
