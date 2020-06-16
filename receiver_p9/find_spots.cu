@@ -47,7 +47,7 @@
 // 01
 // --> but this part of app cares about four top/bottom modules
 // --> so one chunk will be 67 and another 45 (or resp. 32 and 01)
-#define FRAGMENT_SIZE ((NMODULES/2) * COLS * LINES * sizeof(int16_t))
+#define FRAGMENT_SIZE_16 ((NMODULES/2) * COLS * LINES * sizeof(int16_t))
 
 // CUDA calculation streams
 cudaStream_t stream[NCUDA_STREAMS];
@@ -160,11 +160,13 @@ int setup_gpu(int device) {
          return 1;
     }
 
+    // NIMAGES_PER_STREAM * FRAGMENT_SIZE is the same for 16 and 32-bit image
+    // there is half images per stream, but twice in size
     // Initialize input memory on GPU
-    size_t gpu_data16_size = NCUDA_STREAMS * NIMAGES_PER_STREAM * FRAGMENT_SIZE;
-    err = cudaMalloc((void **) &gpu_data, gpu_data16_size);
+    size_t gpu_data_size = NCUDA_STREAMS * NIMAGES_PER_STREAM * FRAGMENT_SIZE_16;
+    err = cudaMalloc((void **) &gpu_data, gpu_data_size);
     if (err != cudaSuccess) {
-         std::cerr << "GPU: Mem alloc. error (data) " <<  gpu_data16_size / 1024 / 1024 << std::endl;
+         std::cerr << "GPU: Mem alloc. error (data) " <<  gpu_data_size / 1024 / 1024 << std::endl;
          return 1;
     }
 
@@ -340,9 +342,13 @@ void *run_gpu_thread(void *in_threadarg) {
 
     std::vector<spot_t> spots;
 
+    // NIMAGES_PER_STREAM is defined for 16-bit image, so it needs to be adjusted for 32-bit
+    size_t images_per_stream = NIMAGES_PER_STREAM * 2 / experiment_settings.pixel_depth;
+    size_t fragment_size = ((NMODULES/2) * COLS * LINES * experiment_settings.pixel_depth);
+
+    size_t total_chunks = experiment_settings.nimages_to_write / images_per_stream;
     // Account for leftover
-    size_t total_chunks = experiment_settings.nimages_to_write / NIMAGES_PER_STREAM;
-    if (experiment_settings.nimages_to_write - total_chunks * NIMAGES_PER_STREAM > 0)
+    if (experiment_settings.nimages_to_write - total_chunks * images_per_stream > 0)
            total_chunks++;
 
     size_t thread_id = arg->ThreadID;
@@ -350,7 +356,7 @@ void *run_gpu_thread(void *in_threadarg) {
     cudaEvent_t event_mem_copied;
     cudaEventCreate (&event_mem_copied);
 
-    strong_pixel *host_out = (strong_pixel *) calloc(NIMAGES_PER_STREAM * 2 * MAX_STRONG, sizeof(strong_pixel));
+    strong_pixel *host_out = (strong_pixel *) calloc(images_per_stream * 2 * MAX_STRONG, sizeof(strong_pixel));
 
     for (size_t chunk = thread_id;
          chunk < total_chunks;
@@ -358,9 +364,8 @@ void *run_gpu_thread(void *in_threadarg) {
 
          size_t ib_slice = chunk % (NCUDA_STREAMS*CUDA_TO_IB_BUFFER);
 
-//         size_t frame0 = ib_slice * NIMAGES_PER_STREAM;
-         size_t images = experiment_settings.nimages_to_write - chunk * NIMAGES_PER_STREAM;
-         if (images > NIMAGES_PER_STREAM) images = NIMAGES_PER_STREAM;
+         size_t images = experiment_settings.nimages_to_write - chunk * images_per_stream;
+         if (images > images_per_stream) images = images_per_stream;
 
          pthread_mutex_lock(writer_threads_done_mutex+ib_slice);
          // Wait till everyone is done
@@ -375,9 +380,9 @@ void *run_gpu_thread(void *in_threadarg) {
 
          // Copy frames to GPU memory
          cudaError_t err;
-         err = cudaMemcpyAsync(gpu_data + thread_id * NIMAGES_PER_STREAM * FRAGMENT_SIZE, 
-               ib_buffer + ib_slice * NIMAGES_PER_STREAM * FRAGMENT_SIZE,
-               images * FRAGMENT_SIZE,
+         err = cudaMemcpyAsync(gpu_data + thread_id * images_per_stream * fragment_size, 
+               ib_buffer + ib_slice * images_per_stream * fragment_size,
+               images * fragment_size,
                cudaMemcpyHostToDevice, stream[thread_id]);
          if (err != cudaSuccess) {
              std::cerr << "GPU: memory copy error for slice " << thread_id << "/" << ib_slice << "frames: " << images << "(" << cudaGetErrorString(err) << ")" << std::endl;
@@ -387,10 +392,15 @@ void *run_gpu_thread(void *in_threadarg) {
          cudaEventRecord (event_mem_copied, stream[thread_id]);
 
          // Start GPU kernel
-         // TODO - handle frame summation
-         find_spots_colspot<int16_t> <<<NIMAGES_PER_STREAM * 2 / 64, 64, 0, stream[thread_id]>>> 
-                 ((int16_t *) (gpu_data + thread_id * NIMAGES_PER_STREAM * FRAGMENT_SIZE), 
-                  gpu_out + thread_id * NIMAGES_PER_STREAM * 2 * MAX_STRONG, 
+         if (experiment_settings.pixel_depth == 2)
+             find_spots_colspot<int16_t> <<<images_per_stream * 2 / 32, 32, 0, stream[thread_id]>>>
+                 ((int16_t *) (gpu_data + thread_id * images_per_stream * fragment_size),
+                  gpu_out + thread_id * images_per_stream * 2 * MAX_STRONG,
+                  experiment_settings.strong_pixel, images * 2);
+         else
+             find_spots_colspot<int32_t> <<<images_per_stream * 2 / 32, 32, 0, stream[thread_id]>>>
+                 ((int32_t *) (gpu_data + thread_id * images_per_stream * fragment_size),
+                  gpu_out + thread_id * images_per_stream * 2 * MAX_STRONG,
                   experiment_settings.strong_pixel, images * 2);
 
          // After data are copied, one can release buffer
@@ -402,7 +412,6 @@ void *run_gpu_thread(void *in_threadarg) {
 
          // Broadcast to everyone waiting, that buffer can be overwritten by next iteration
          pthread_mutex_lock(cuda_stream_ready_mutex+ib_slice);
-         // TODO - this is fishy, check!
          cuda_stream_ready[ib_slice] = chunk + NCUDA_STREAMS*CUDA_TO_IB_BUFFER;
          pthread_cond_broadcast(cuda_stream_ready_cond+ib_slice);
          pthread_mutex_unlock(cuda_stream_ready_mutex+ib_slice);
@@ -415,13 +424,13 @@ void *run_gpu_thread(void *in_threadarg) {
          }
 
          // Copy result back to host memory
-         err = cudaMemcpy(host_out, 
-                         gpu_out + thread_id * NIMAGES_PER_STREAM * 2 * MAX_STRONG,
+         err = cudaMemcpy(host_out,
+                         gpu_out + thread_id * images_per_stream * 2 * MAX_STRONG,
                          images * 2 * MAX_STRONG * sizeof(strong_pixel),
                          cudaMemcpyDeviceToHost);
 
          // Analyze results to find spots
-         analyze_spots(host_out, spots, experiment_settings.connect_spots_between_frames, images, chunk * NIMAGES_PER_STREAM);
+         analyze_spots(host_out, spots, experiment_settings.connect_spots_between_frames, images, chunk * images_per_stream);
 
          // TODO: send spots by TCP/IP here
     }

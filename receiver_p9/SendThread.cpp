@@ -223,9 +223,11 @@ void *run_send_thread(void *in_threadarg) {
 
     uint32_t current_frame_number = lastModuleFrameNumber();
 
+    size_t images_per_stream = NIMAGES_PER_STREAM * 2 / experiment_settings.pixel_depth;
+
     // Account for leftover
-    size_t total_chunks = experiment_settings.nimages_to_write / NIMAGES_PER_STREAM;
-    if (experiment_settings.nimages_to_write - total_chunks * NIMAGES_PER_STREAM > 0)
+    size_t total_chunks = experiment_settings.nimages_to_write / images_per_stream;
+    if (experiment_settings.nimages_to_write - total_chunks * images_per_stream > 0)
            total_chunks++;
 
     size_t current_chunk = 0; // assume that receiver_settings.compression_threads << NIMAGES_PER_STREAM
@@ -235,7 +237,7 @@ void *run_send_thread(void *in_threadarg) {
     		image += receiver_settings.compression_threads) {
         if (experiment_settings.enable_spot_finding) {
             // Synchronization of GPU part with GPU threads
-            size_t new_chunk = image / NIMAGES_PER_STREAM;
+            size_t new_chunk = image / images_per_stream;
 
             // If we operate in the same chunk as before, there is no need to synchronize
             if (current_chunk != new_chunk) {
