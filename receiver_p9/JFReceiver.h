@@ -24,13 +24,11 @@
 
 #define RECEIVING_DELAY 5
 
-
 #define PTHREAD_ERROR(ret,func) if (ret) printf("%s(%d) %s: err = %d\n",__FILE__,__LINE__, #func, ret), exit(ret)
 
 #define TIMEOUT 600
 
-#define NIMAGES_PER_STREAM 320L
-#define NCUDA_STREAMS 6
+#define NCUDA_STREAMS 8
 #define CUDA_TO_IB_BUFFER 2L // How much larger is IB buffer as compared to CUDA
 
 #define RDMA_SQ_PSN 532

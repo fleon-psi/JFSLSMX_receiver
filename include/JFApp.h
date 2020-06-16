@@ -10,10 +10,13 @@
 #include "action_rx100G.h"
 
 #define COMPOSED_IMAGE_SIZE (514L*1030L*NMODULES)
-//#define RDMA_BUFFER_MAX_ELEM_SIZE (COMPOSED_IMAGE_SIZE*si)
 
 #define TCPIP_CONN_MAGIC_NUMBER 123434L
 #define TCPIP_DONE_MAGIC_NUMBER  56789L
+
+// Number of images per single CUDA run
+// This number is 1/2 if 32-bit pixel depth is used
+#define NIMAGES_PER_STREAM 320L
 
 // Settings exchanged between writer and receiver
 struct experiment_settings_t {
