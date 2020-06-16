@@ -117,6 +117,7 @@ extern pthread_mutex_t spots_mutex;
 
 extern std::vector<double> spot_count_per_image;
 extern std::vector<double> spot_intensity_per_resolution;
+extern int spot_statistics_sequence; // spot statistics sequence is incremented every time these are updated, so plot can be changed then
 extern pthread_mutex_t spots_statistics_mutex;
 
 #ifndef OFFLINE

@@ -252,6 +252,7 @@ int jfwriter_arm() {
     size_t omega_range = std::lround(experiment_settings.nimages_to_write * experiment_settings.omega_angle_per_image);
     spot_count_per_image.clear();
     spot_count_per_image.resize(omega_range, 0);
+    spot_statistics_sequence = 0;
     pthread_mutex_unlock(&spots_statistics_mutex);
 
     return jfwriter_start();
