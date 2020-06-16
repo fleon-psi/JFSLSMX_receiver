@@ -10,17 +10,26 @@ function formatTime(val) {
     return (x < 0.001)?((x*1000000).toPrecision(3) + " us"):((x*1000).toPrecision(3) + " ms");   
 }
 
+function handleErrors(response) {
+    if (!response.ok) {
+        throw Error(response.statusText);
+    }
+    return response;
+}
+
 class App extends Component {
   state = {
-     value: {state: "Not connected"},
-     expertMode: false,
+     connected: false,
+     expertMode: false
   }
 
   updateREST() {
     fetch('http://' + window.location.hostname + ':5232/', {crossDomain:true})
+    .then(handleErrors)
     .then(res => res.json())
     .then(data => {
          this.setState({ daqState: data.state});
+         this.setState({ connected: true});
          this.setState({ params: [
               {desc: "Frame time", value: formatTime(data.frame_time)},
               {desc: "Frame time (internal)", value: formatTime(data.frame_time_detector)},
@@ -82,7 +91,7 @@ class App extends Component {
             ]});
     })
     .catch(error => {
-        this.setState({value: {state: "Not connected"}})
+        this.setState({value: {connected: false}})
      });
      this.setState({contrast : this.state.contrast + 1});
   }
@@ -105,17 +114,20 @@ class App extends Component {
   };
 
   render() {
-    return <div><StatusBar daqState={this.state.daqState} handleChange={this.handleChange} expertMode={this.state.expertMode} />
-     <br/><br/>
-
-     {this.state.expertMode?
-     <div><DataTable params={this.state.params}/><br/><br/>
-     <DetectorGrid modules={this.state.modules}/><br/><br/>
-     <iframe title="grafana" src="http://mx-jungfrau-1:3000/d-solo/npmZQ7kMk/servers?orgId=1&theme=light&panelId=12" width="100%" height="250" frameBorder="0"/>
-     </div>
-    :<Preview></Preview>}
-    <br/>
-
+    return <div>
+        {this.state.connected?<div>
+            <StatusBar daqState={this.state.daqState} handleChange={this.handleChange} expertMode={this.state.expertMode} />
+            <br/><br/>
+            {this.state.expertMode?
+                <div><DataTable params={this.state.params}/><br/><br/>
+                <DetectorGrid modules={this.state.modules}/><br/><br/>
+                <iframe title="grafana" src="http://mx-jungfrau-1:3000/d-solo/npmZQ7kMk/servers?orgId=1&theme=light&panelId=12" width="100%" height="250" frameBorder="0"/>
+                </div>
+            :
+                <Preview></Preview>}
+            <br/></div>
+         :
+            <h1> Detector server not running </h1>}
      </div>
   }
 }
