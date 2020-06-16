@@ -39,6 +39,7 @@ pthread_cond_t ib_buffer_occupancy_cond = PTHREAD_COND_INITIALIZER;
 // TCP/IP socket
 int sockfd;
 int accepted_socket; // There is only one accepted socket at the time
+pthread_mutex_t accepted_socket_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Buffers for communication with the FPGA
 int16_t *frame_buffer = NULL;

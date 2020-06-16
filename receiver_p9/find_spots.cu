@@ -24,6 +24,8 @@
 #include <map>
 #include <vector>
 #include <pthread.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 #include "JFReceiver.h"
 
 // Maximum number of strong pixel in 2 veritcal modules
@@ -327,7 +329,7 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
           spot.y = spot.y / spot.photons + (NCARDS - receiver_settings.gpu_device - 1) * 2 * LINES;
           // Account for frame number
           spot.z = spot.z / spot.photons + image0;
-//          spots.push_back(spot);
+          //TODO 100 frames per spot is arbitrary limit - these need to be defined by the experiment settings
           if ((spot.pixels > 3) && (spot.depth < 100)) spots.push_back(spot);
           iterator = strong_pixel_maps[i].begin(); // Get first unprocessed spot in this frame
       }
@@ -339,8 +341,6 @@ void *run_gpu_thread(void *in_threadarg) {
 
     // GPU device is valid on per-thread basis, so every thread needs to set it
     cudaSetDevice(receiver_settings.gpu_device);
-
-    std::vector<spot_t> spots;
 
     // NIMAGES_PER_STREAM is defined for 16-bit image, so it needs to be adjusted for 32-bit
     size_t images_per_stream = NIMAGES_PER_STREAM * 2 / experiment_settings.pixel_depth;
@@ -359,6 +359,8 @@ void *run_gpu_thread(void *in_threadarg) {
     for (size_t chunk = thread_id;
          chunk < total_chunks;
          chunk += NCUDA_STREAMS) {
+
+         std::vector<spot_t> spots;
 
          size_t ib_slice = chunk % (NCUDA_STREAMS*CUDA_TO_IB_BUFFER);
 
@@ -425,16 +427,14 @@ void *run_gpu_thread(void *in_threadarg) {
          // gpu_out is in unified memory and doesn't need to be explicitly copied to CPU
          analyze_spots(gpu_out + thread_id * images_per_stream * 2 * MAX_STRONG, spots, experiment_settings.connect_spots_between_frames, images, chunk * images_per_stream);
 
-         // TODO: send spots by TCP/IP here
+         // Send spots found by spot finder via TCP/IP
+         pthread_mutex_lock(&accepted_socket_mutex);
+         size_t spot_data_size = spots.size();
+         send(accepted_socket, &spot_data_size, sizeof(size_t), 0);
+         send(accepted_socket, spots.data(), spot_data_size * sizeof(spot_t), 0);
+         pthread_mutex_unlock(&accepted_socket_mutex);
     }
     cudaEventDestroy (event_mem_copied);
-
-    // Merge calculated spots to a single vector
-    pthread_mutex_lock(&all_spots_mutex);
-    for (int i = 0; i < spots.size(); i++)
-        all_spots.push_back(spots[i]);
-    pthread_mutex_unlock(&all_spots_mutex);
-
     pthread_exit(0);
 }
 

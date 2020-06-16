@@ -251,6 +251,19 @@ void TCP_exchange_IB_parameters(ib_comm_settings_t *remote) {
 	read(accepted_socket, remote, sizeof(ib_comm_settings_t));
 }
 
+int TCP_receive(int sockfd, char *buffer, size_t size) {
+    size_t remaining_size = size;
+    while (remaining_size > 0) {
+        ssize_t received = read(sockfd, buffer + (size - remaining_size), remaining_size);
+        if (received <= 0) {
+            std::cerr << "Error reading from TCP/IP socket" << std::endl;
+            return 1;
+        }
+	else remaining_size -= received;
+    }
+    return 0;
+}
+
 int main(int argc, char **argv) {
 	int ret;
 
@@ -299,8 +312,7 @@ int main(int argc, char **argv) {
 		std::cout << "Bogus TCP/IP connection" << std::endl;
 
 	   // Receive experimental settings via TCP/IP
-           // TODO: Check size of received data
-	   read(accepted_socket, &experiment_settings, sizeof(experiment_settings_t));
+           TCP_receive(accepted_socket, (char *) &experiment_settings, sizeof(experiment_settings_t));
            if (experiment_settings.conversion_mode == 255) {
               std::cout << "Exiting" << std::endl;
               break;
@@ -415,11 +427,6 @@ int main(int argc, char **argv) {
 	   send(accepted_socket, online_statistics, sizeof(online_statistics_t), 0);
            // Send gain, pedestal and pixel mask
 	   send(accepted_socket, gain_pedestal_data, 7*NPIXEL*sizeof(uint16_t), 0);
-
-           // Send spots found by spot finder
-           size_t spot_data_size = all_spots.size();
-           send(accepted_socket, &spot_data_size, sizeof(size_t), 0);
-           send(accepted_socket, all_spots.data(), spot_data_size * sizeof(spot_t), 0);
 
            // Reset QP
            switch_to_reset(ib_settings);

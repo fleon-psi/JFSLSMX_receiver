@@ -85,6 +85,7 @@ extern char *ib_buffer;
 // TCP/IP socket
 extern int sockfd;
 extern int accepted_socket; // There is only one accepted socket at the time
+extern pthread_mutex_t accepted_socket_mutex; // For sending spot finding results, mutex is necessary to ensure data consistency on accepted_socket
 
 // Thread information
 struct ThreadArg {
@@ -101,7 +102,6 @@ extern pthread_cond_t  trigger_frame_cond;
 extern int16_t ib_buffer_occupancy[RDMA_SQ_SIZE];
 extern pthread_mutex_t ib_buffer_occupancy_mutex;
 extern pthread_cond_t ib_buffer_occupancy_cond;
-
 
 int setup_snap(uint32_t card_number);
 void close_snap();
