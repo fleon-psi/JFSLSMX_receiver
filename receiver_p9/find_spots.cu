@@ -170,8 +170,8 @@ int setup_gpu(int device) {
          return 1;
     }
 
-    // Initialize output memory on GPU
-    err = cudaMalloc((void **) &gpu_out, NCUDA_STREAMS * NIMAGES_PER_STREAM * 2 * MAX_STRONG * sizeof(strong_pixel)); // frame is divided into 2 vertical slices
+    // Initialize output memory as GPU/CPU unified memory
+    err = cudaMallocManaged((void **) &gpu_out, NCUDA_STREAMS * NIMAGES_PER_STREAM * 2 * MAX_STRONG * sizeof(strong_pixel)); // frame is divided into 2 vertical slices
     if (err != cudaSuccess) {
          std::cerr << "GPU: Mem alloc. error (output)" << std::endl;
          return 1;
@@ -356,8 +356,6 @@ void *run_gpu_thread(void *in_threadarg) {
     cudaEvent_t event_mem_copied;
     cudaEventCreate (&event_mem_copied);
 
-    strong_pixel *host_out = (strong_pixel *) calloc(images_per_stream * 2 * MAX_STRONG, sizeof(strong_pixel));
-
     for (size_t chunk = thread_id;
          chunk < total_chunks;
          chunk += NCUDA_STREAMS) {
@@ -423,14 +421,9 @@ void *run_gpu_thread(void *in_threadarg) {
              pthread_exit(0);
          }
 
-         // Copy result back to host memory
-         err = cudaMemcpy(host_out,
-                         gpu_out + thread_id * images_per_stream * 2 * MAX_STRONG,
-                         images * 2 * MAX_STRONG * sizeof(strong_pixel),
-                         cudaMemcpyDeviceToHost);
-
          // Analyze results to find spots
-         analyze_spots(host_out, spots, experiment_settings.connect_spots_between_frames, images, chunk * images_per_stream);
+         // gpu_out is in unified memory and doesn't need to be explicitly copied to CPU
+         analyze_spots(gpu_out + thread_id * images_per_stream * 2 * MAX_STRONG, spots, experiment_settings.connect_spots_between_frames, images, chunk * images_per_stream);
 
          // TODO: send spots by TCP/IP here
     }
@@ -442,7 +435,6 @@ void *run_gpu_thread(void *in_threadarg) {
         all_spots.push_back(spots[i]);
     pthread_mutex_unlock(&all_spots_mutex);
 
-//    std::cout << "GPU: Thread "<< arg->ThreadID << " done" << std::endl;
     pthread_exit(0);
 }
 
