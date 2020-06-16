@@ -146,8 +146,7 @@ __global__ void find_spots_colspot(T *in, strong_pixel *out, float strong, int N
    }
 }
 
-int16_t *gpu_data16;
-int32_t *gpu_data32;
+char *gpu_data;
 strong_pixel *gpu_out;
 
 int setup_gpu(int device) {
@@ -163,7 +162,7 @@ int setup_gpu(int device) {
 
     // Initialize input memory on GPU
     size_t gpu_data16_size = NCUDA_STREAMS * NIMAGES_PER_STREAM * FRAGMENT_SIZE;
-    err = cudaMalloc((void **) &gpu_data16, gpu_data16_size);
+    err = cudaMalloc((void **) &gpu_data, gpu_data16_size);
     if (err != cudaSuccess) {
          std::cerr << "GPU: Mem alloc. error (data) " <<  gpu_data16_size / 1024 / 1024 << std::endl;
          return 1;
@@ -197,7 +196,7 @@ int setup_gpu(int device) {
 
 int close_gpu() {
     cudaFree(gpu_out);
-    cudaFree(gpu_data16);
+    cudaFree(gpu_data);
     cudaError_t err = cudaHostUnregister(ib_buffer);
     for (int i = 0; i < NCUDA_STREAMS; i++)
         err = cudaStreamDestroy(stream[i]);
@@ -346,14 +345,14 @@ void *run_gpu_thread(void *in_threadarg) {
     if (experiment_settings.nimages_to_write - total_chunks * NIMAGES_PER_STREAM > 0)
            total_chunks++;
 
-    size_t gpu_slice = arg->ThreadID;
+    size_t thread_id = arg->ThreadID;
 
     cudaEvent_t event_mem_copied;
     cudaEventCreate (&event_mem_copied);
 
     strong_pixel *host_out = (strong_pixel *) calloc(NIMAGES_PER_STREAM * 2 * MAX_STRONG, sizeof(strong_pixel));
 
-    for (size_t chunk = gpu_slice;
+    for (size_t chunk = thread_id;
          chunk < total_chunks;
          chunk += NCUDA_STREAMS) {
 
@@ -376,22 +375,22 @@ void *run_gpu_thread(void *in_threadarg) {
 
          // Copy frames to GPU memory
          cudaError_t err;
-         err = cudaMemcpyAsync(gpu_data16 + gpu_slice * NIMAGES_PER_STREAM * FRAGMENT_SIZE / sizeof(uint16_t), 
+         err = cudaMemcpyAsync(gpu_data + thread_id * NIMAGES_PER_STREAM * FRAGMENT_SIZE, 
                ib_buffer + ib_slice * NIMAGES_PER_STREAM * FRAGMENT_SIZE,
                images * FRAGMENT_SIZE,
-               cudaMemcpyHostToDevice, stream[gpu_slice]);
+               cudaMemcpyHostToDevice, stream[thread_id]);
          if (err != cudaSuccess) {
-             std::cerr << "GPU: memory copy error for slice " << gpu_slice << "/" << ib_slice << "frames: " << images << "(" << cudaGetErrorString(err) << ")" << std::endl;
+             std::cerr << "GPU: memory copy error for slice " << thread_id << "/" << ib_slice << "frames: " << images << "(" << cudaGetErrorString(err) << ")" << std::endl;
              pthread_exit(0);
          }
 
-         cudaEventRecord (event_mem_copied, stream[gpu_slice]);
+         cudaEventRecord (event_mem_copied, stream[thread_id]);
 
          // Start GPU kernel
          // TODO - handle frame summation
-         find_spots_colspot<int16_t> <<<NIMAGES_PER_STREAM * 2 / 32, 32, 0, stream[gpu_slice]>>> 
-                 (gpu_data16 + gpu_slice * NIMAGES_PER_STREAM * FRAGMENT_SIZE / 2, 
-                  gpu_out + gpu_slice * NIMAGES_PER_STREAM * 2 * MAX_STRONG, 
+         find_spots_colspot<int16_t> <<<NIMAGES_PER_STREAM * 2 / 64, 64, 0, stream[thread_id]>>> 
+                 ((int16_t *) (gpu_data + thread_id * NIMAGES_PER_STREAM * FRAGMENT_SIZE), 
+                  gpu_out + thread_id * NIMAGES_PER_STREAM * 2 * MAX_STRONG, 
                   experiment_settings.strong_pixel, images * 2);
 
          // After data are copied, one can release buffer
@@ -403,12 +402,13 @@ void *run_gpu_thread(void *in_threadarg) {
 
          // Broadcast to everyone waiting, that buffer can be overwritten by next iteration
          pthread_mutex_lock(cuda_stream_ready_mutex+ib_slice);
+         // TODO - this is fishy, check!
          cuda_stream_ready[ib_slice] = chunk + NCUDA_STREAMS*CUDA_TO_IB_BUFFER;
          pthread_cond_broadcast(cuda_stream_ready_cond+ib_slice);
          pthread_mutex_unlock(cuda_stream_ready_mutex+ib_slice);
 
          // Ensure kernel has finished
-         err = cudaStreamSynchronize(stream[gpu_slice]);
+         err = cudaStreamSynchronize(stream[thread_id]);
          if (err != cudaSuccess) {
              std::cerr << "GPU: execution error" << std::endl;
              pthread_exit(0);
@@ -416,7 +416,7 @@ void *run_gpu_thread(void *in_threadarg) {
 
          // Copy result back to host memory
          err = cudaMemcpy(host_out, 
-                         gpu_out + gpu_slice * NIMAGES_PER_STREAM * 2 * MAX_STRONG,
+                         gpu_out + thread_id * NIMAGES_PER_STREAM * 2 * MAX_STRONG,
                          images * 2 * MAX_STRONG * sizeof(strong_pixel),
                          cudaMemcpyDeviceToHost);
 
