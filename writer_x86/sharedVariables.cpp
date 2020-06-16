@@ -16,8 +16,11 @@
 
 #include "JFWriter.h"
 
-pthread_t *writer = NULL;
+pthread_t *writer_thread = NULL;
 writer_thread_arg_t *writer_thread_arg = NULL;
+
+pthread_t metadata_thread[NCARDS];
+writer_thread_arg_t metadata_thread_arg[NCARDS];
 
 writer_settings_t writer_settings;
 gain_pedestal_t gain_pedestal;

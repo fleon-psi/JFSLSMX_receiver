@@ -84,10 +84,14 @@ struct gain_pedestal_t {
         uint16_t pixel_mask[NCARDS*NPIXEL];
 };
 
-void *writer_thread(void* threadArg);
+void *run_writer_thread(void* thread_arg);
+void *run_metadata_thread(void* thread_arg);
 
-extern pthread_t *writer;
+extern pthread_t *writer_thread;
 extern writer_thread_arg_t *writer_thread_arg;
+
+extern pthread_t metadata_thread[NCARDS];
+extern writer_thread_arg_t metadata_thread_arg[NCARDS];
 
 extern gain_pedestal_t gain_pedestal;
 extern online_statistics_t online_statistics[NCARDS];
@@ -151,6 +155,7 @@ int close_detector();
 
 int setup_infiniband(int card_id);
 int close_infiniband(int card_id);
+int tcp_receive(int sockfd, char *buffer, size_t size);
 int connect_to_power9(int card_id);
 int disconnect_from_power9(int card_id);
 int exchange_magic_number(int sockfd);

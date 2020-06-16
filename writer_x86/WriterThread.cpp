@@ -30,7 +30,7 @@ extern "C" {
     void bshuf_write_uint32_BE(void* buf, uint32_t num);
 }
 
-void *writer_thread(void* thread_arg) {
+void *run_writer_thread(void* thread_arg) {
         // Read thread ID
 	writer_thread_arg_t *arg = (writer_thread_arg_t *)thread_arg;
 	int thread_id = arg->thread_id;

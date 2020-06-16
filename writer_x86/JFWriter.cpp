@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <cmath>
 #include <cstdlib>
 #include <cstdio>
 #include <fstream>
@@ -82,13 +83,14 @@ int jfwriter_start() {
         if (writer_settings.write_mode == JF_WRITE_HDF5)
             if (open_data_hdf5()) return 1;
 
-        writer = (pthread_t *) calloc(writer_settings.nthreads, sizeof(pthread_t));
+        writer_thread = (pthread_t *) calloc(writer_settings.nthreads, sizeof(pthread_t));
         writer_thread_arg = (writer_thread_arg_t *) calloc(writer_settings.nthreads, sizeof(writer_thread_arg_t));
 
         // Barrier #1 - All threads on P9 are set up running
 	for (int i = 0; i < NCARDS; i++)
             if (exchange_magic_number(writer_connection_settings[i].sockfd)) return 1;
 
+        // Start writer threads - these threads receive images via IB Verbs
 	if (experiment_settings.nimages_to_write > 0) {
 		for (int i = 0; i < writer_settings.nthreads; i++) {
 			writer_thread_arg[i].thread_id = i / NCARDS;
@@ -96,13 +98,16 @@ int jfwriter_start() {
 			    writer_thread_arg[i].card_id = i % NCARDS;
                         else
                             writer_thread_arg[i].card_id = 0;
-			int ret = pthread_create(&(writer[i]), NULL, writer_thread, &(writer_thread_arg[i]));
+			int ret = pthread_create(writer_thread+i, NULL, run_writer_thread, writer_thread_arg+i);
 		}
         }
 
-        // Barrier #2 - All threads are set up running
-	for (int i = 0; i < NCARDS; i++)
-            if (exchange_magic_number(writer_connection_settings[i].sockfd)) return 1;
+        // Start metadata threads - these threads receive metadata via TCP/IP socket
+        // When started, these threads will exchange magic number again (barrier #2)
+        for (int i = 0; i < NCARDS; i++) {
+             metadata_thread_arg[i].card_id = i;
+             int ret = pthread_create(metadata_thread+i, NULL, run_metadata_thread, metadata_thread_arg+i);
+        }
 	
 #ifndef OFFLINE
         trigger_detector();
@@ -119,8 +124,8 @@ int jfwriter_stop() {
             return 0;
 
 	if (experiment_settings.nimages_to_write > 0) {
-		for (int i = 0; i < writer_settings.nthreads; i++)
-			int ret = pthread_join(writer[i], NULL);
+	    for (int i = 0; i < writer_settings.nthreads; i++)
+		int ret = pthread_join(writer_thread[i], NULL);
 	}
 
         // Data files can be closed, when all frames were written,
@@ -132,8 +137,10 @@ int jfwriter_stop() {
         clock_gettime(CLOCK_REALTIME, &time_end);
 
         // Involves barrier after collecting data
-	for (int i = 0; i < NCARDS; i++)
+	for (int i = 0; i < NCARDS; i++) {
+            int ret = pthread_join(metadata_thread[i], NULL);
             if (disconnect_from_power9(i)) return 1;
+        }
 #ifndef OFFLINE        
         close_detector();
 #endif
@@ -239,23 +246,18 @@ int jfwriter_arm() {
 
     writer_settings.timing_trigger = true;
     spots.clear();
+
+    // Reset statistics
+    pthread_mutex_lock(&spots_statistics_mutex);
+    size_t omega_range = std::lround(experiment_settings.nimages_to_write * experiment_settings.omega_angle_per_image);
+    spot_count_per_image.clear();
+    spot_count_per_image.resize(omega_range, 0);
+    pthread_mutex_unlock(&spots_statistics_mutex);
+
     return jfwriter_start();
 }
 
 int jfwriter_disarm() {
     int retval = jfwriter_stop();
-
-    // Calculate spots per frame
-    pthread_mutex_lock(&spots_statistics_mutex);
-
-    spot_count_per_image.clear();
-    spot_count_per_image.resize(experiment_settings.nimages_to_write, 0);
-    for (int i = 0; i < spots.size() ; i++) {
-        size_t z = (size_t) spots[i].z;
-        if ((z >= 0) && (z < experiment_settings.nimages_to_write)) 
-            spot_count_per_image[z]++;
-    }
-    pthread_mutex_unlock(&spots_statistics_mutex);
-
     return retval;
 }

@@ -184,45 +184,6 @@ int disconnect_from_power9(int card_id) {
                 return 0;
         }
         
-	// Send pedestal, header data and collection statistics
-	read(writer_connection_settings[card_id].sockfd,
-			&(online_statistics[card_id]), sizeof(online_statistics_t));
-
-        tcp_receive(writer_connection_settings[card_id].sockfd,
-                    (char *) (gain_pedestal.gainG0 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
-        tcp_receive(writer_connection_settings[card_id].sockfd,
-                    (char *) (gain_pedestal.gainG1 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
-        tcp_receive(writer_connection_settings[card_id].sockfd,
-                    (char *) (gain_pedestal.gainG2 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
-        tcp_receive(writer_connection_settings[card_id].sockfd,
-                    (char *) (gain_pedestal.pedeG1 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
-        tcp_receive(writer_connection_settings[card_id].sockfd,
-                    (char *) (gain_pedestal.pedeG2 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
-        tcp_receive(writer_connection_settings[card_id].sockfd,
-                    (char *) (gain_pedestal.pedeG0 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
-        tcp_receive(writer_connection_settings[card_id].sockfd,
-                    (char *) (gain_pedestal.pixel_mask + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
-        
-        // Receive spots found by spot finder
-        size_t spot_data_size;
-        tcp_receive(writer_connection_settings[card_id].sockfd,(char *) &spot_data_size, sizeof(size_t));
-        std::cout << "Spot data size " << spot_data_size << std::endl;
-        
-        std::vector<spot_t> local_spots(spot_data_size);
-        if (spot_data_size > 0)
-            tcp_receive(writer_connection_settings[card_id].sockfd, (char *) local_spots.data(), spot_data_size * sizeof(spot_t));
-
-        // Merge spots with the global list
-        // This could be later done in an online manner, so I keep mutex
-        // Although in current scenario it is likely not necessary
-        pthread_mutex_lock(&spots_mutex);
-        for (int i = 0; i < spot_data_size; i++)
-            spots.push_back(local_spots[i]);
-        pthread_mutex_unlock(&spots_mutex);
-
-	// Check magic number again - but don't quit, as the program is finishing anyway soon
-	exchange_magic_number(writer_connection_settings[card_id].sockfd);
-
 	// Close TCP/IP socket
 	close(writer_connection_settings[card_id].sockfd);
         

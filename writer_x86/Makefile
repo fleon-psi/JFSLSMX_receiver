@@ -15,20 +15,6 @@
 # limitations under the License.
 #
 
-HOSTNAME := $(shell hostname)
-UNAME_P := $(shell uname -p)
-
-# Finding $SNAP_ROOT
-ifndef SNAP_ROOT
-# check if we are in sw folder of an action (three directories below snap root)
-ifneq ("$(wildcard ../../../ActionTypes.md)","")
-SNAP_ROOT=$(abspath ../../../)
-else
-$(info You are not building your software from the default directory (/path/to/snap/actions/<action_name>/sw) or specified a wrong $$SNAP_ROOT.)
-$(error Please make sure that $$SNAP_ROOT is set up correctly.)
-endif
-endif
-
 SLS_DETECTOR_PATH=/home/jungfrau/git/slsDetectorPackage
 SLS_DETECTOR_INCLUDE=-I${SLS_DETECTOR_PATH}/slsDetectorSoftware/include -I${SLS_DETECTOR_PATH}/slsSupportLib/include
 SLS_DETECTOR_LIB=-L${SLS_DETECTOR_PATH}/build/bin/ -lSlsDetector -lSlsSupport
@@ -50,7 +36,7 @@ CXXFLAGS= -std=c++14 -Ofast -g -static-intel -xHost -ip -Wall -DUSE_ZSTD -debug 
 LDFLAGS= -Ofast -g -static-intel -xHost -ip -lm -lpthread -lz -libverbs -debug inline-debug-info -lssh $(IPPROOT)/lib/intel64/libippdc.a $(IPPROOT)/lib/intel64/libipps.a $(IPPROOT)/lib/intel64/libippcore.a
 CPPFLAGS= -I. -I../include -I../lz4 -I../zstd/lib -I${HDF5_PATH}/include -I$(PISTACHE_PATH)/include $(SLS_DETECTOR_INCLUDE) -I/usr/local/include/opencv4/
 
-WR_SRCS=Preview.o JFWriter.o NetIO.o FileIO.o WriterThread.o DetConfig.o sharedVariables.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o ../lz4/lz4.c
+WR_SRCS=Preview.o JFWriter.o NetIO.o FileIO.o WriterThread.o DetConfig.o sharedVariables.o MetadataThread.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o ../lz4/lz4.c
 
 all: RESTserver
 
