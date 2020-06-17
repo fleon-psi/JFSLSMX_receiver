@@ -58,5 +58,3 @@ pthread_mutex_t writer_threads_done_mutex[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 pthread_cond_t writer_threads_done_cond[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 int writer_threads_done[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 
-std::vector<spot_t> all_spots;
-pthread_mutex_t all_spots_mutex = PTHREAD_MUTEX_INITIALIZER;

@@ -418,10 +418,8 @@ int main(int argc, char **argv) {
 #endif
 
            // Print some quick statistics
-           std::cout << "Sending done" << std::endl;
            std::cout << "Good packets " << online_statistics->good_packets << " Frames to collect: " << experiment_settings.nframes_to_collect << std::endl;
            std::cout << "Frames collected " << ((double)(online_statistics->good_packets / NMODULES / 128)) / (double) experiment_settings.nframes_to_collect * 100.0 << "%" << std::endl;
-           std::cout << "Spots found " << all_spots.size() << std::endl;
  
 	   // Send header data and collection statistics
 	   send(accepted_socket, online_statistics, sizeof(online_statistics_t), 0);
@@ -439,9 +437,6 @@ int main(int argc, char **argv) {
 
            // Reset status buffer
 	   memset(status_buffer, 0x0, status_buffer_size);
-
-           // Reset spot buffer
-           all_spots.clear();
         }
 
 #ifndef RECEIVE_FROM_FILE

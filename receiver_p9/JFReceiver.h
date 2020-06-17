@@ -28,7 +28,7 @@
 
 #define TIMEOUT 600
 
-#define NCUDA_STREAMS 8
+#define NCUDA_STREAMS 10
 #define CUDA_TO_IB_BUFFER 2L // How much larger is IB buffer as compared to CUDA
 
 #define RDMA_SQ_PSN 532
@@ -56,10 +56,6 @@ struct strong_pixel {
     int16_t line;     // line (relative to chunk (2x vertical modules) read by GPU)
     uint32_t photons; // intensity of the pixel
 };
-
-// Vector containing all spots in the dataset
-extern std::vector<spot_t> all_spots;
-extern pthread_mutex_t all_spots_mutex;
 
 // Buffers for communication with the FPGA
 extern int16_t *frame_buffer;
