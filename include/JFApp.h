@@ -18,6 +18,9 @@
 // This number is 1/2 if 32-bit pixel depth is used
 #define NIMAGES_PER_STREAM 320L
 
+// Number of FPGA boards in total for the whole setup
+#define NCARDS 2
+
 // Settings exchanged between writer and receiver
 struct experiment_settings_t {
 	uint8_t  conversion_mode;
@@ -56,6 +59,8 @@ struct experiment_settings_t {
         bool     enable_spot_finding;          // true = spot finding is ON
         bool     connect_spots_between_frames; // true = rotation measurement, false = raster, jet
         double   strong_pixel;                 // STRONG_PIXEL in XDS
+        uint16_t max_spot_depth;               // Maximum images per spot
+        uint16_t min_pixels_per_spot;          // Minimum pixels per spot
 };
 
 struct receiver_output_t {
