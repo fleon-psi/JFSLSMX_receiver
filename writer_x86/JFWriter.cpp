@@ -34,33 +34,33 @@ double mean_pedestalG2[NMODULES*NCARDS];
 size_t bad_pixels[NMODULES*NCARDS];
 
 int jfwriter_setup() {
-        // Register HDF5 bitshuffle filter
-        H5Zregister(bshuf_H5Filter);
+    // Register HDF5 bitshuffle filter
+    H5Zregister(bshuf_H5Filter);
 #ifndef OFFLINE
-        try {
-            det = new sls::Detector();
-        } catch (const std::runtime_error& error) {
-            return 1;
-        }
+    try {
+        det = new sls::Detector();
+    } catch (const std::runtime_error& error) {
+        return 1;
+    }
 #endif
-	for (int i = 0; i < NCARDS; i++) {
-            // Setup IB and allocate memory
-            if (setup_infiniband(i)) return 1;
-	    pthread_mutex_init(&(remaining_images_mutex[i]), NULL);
-	}
-        return 0;
+    for (int i = 0; i < NCARDS; i++) {
+        // Setup IB and allocate memory
+        if (setup_infiniband(i)) return 1;
+        pthread_mutex_init(&(remaining_images_mutex[i]), NULL);
+    }
+    return 0;
 }
 
 int jfwriter_close() {
-	for (int i = 0; i < NCARDS; i++) {
-            // Setup IB and allocate memory
-            close_infiniband(i);
-	    pthread_mutex_destroy(&(remaining_images_mutex[i]));
-	}
+    for (int i = 0; i < NCARDS; i++) {
+        // Setup IB and allocate memory
+        close_infiniband(i);
+        pthread_mutex_destroy(&(remaining_images_mutex[i]));
+    }
 #ifndef OFFLINE
-        delete(det);
+    delete(det);
 #endif
-        return 0;
+    return 0;
 }
 
 
@@ -68,85 +68,86 @@ int jfwriter_close() {
 // Arm, disarm and pedestalG0/1/2 are wrappers for actual tasks
 
 int jfwriter_start() {
-	for (int i = 0; i < NCARDS; i++) {
-            if (connect_to_power9(i)) return 1;
-	    remaining_images[i] = experiment_settings.nimages_to_write;
-	}
+    for (int i = 0; i < NCARDS; i++) {
+        if (connect_to_power9(i)) return 1;
+        remaining_images[i] = experiment_settings.nimages_to_write;
+    }
 
-	if (experiment_settings.conversion_mode == MODE_QUIT)
-            return 0;
+    if (experiment_settings.conversion_mode == MODE_QUIT)
+        return 0;
 #ifndef OFFLINE
-        if (setup_detector() == 1) return 1;
+    if (setup_detector() == 1) return 1;
 #endif
-        if (writer_settings.HDF5_prefix != "")
-            if (open_master_hdf5()) return 1;;
+    if (writer_settings.HDF5_prefix != "")
+        if (open_master_hdf5()) return 1;
+
+    writer_thread = (pthread_t *) calloc(writer_settings.nthreads, sizeof(pthread_t));
+    writer_thread_arg = (writer_thread_arg_t *) calloc(writer_settings.nthreads, sizeof(writer_thread_arg_t));
+
+    // Barrier #1 - All threads on P9 are set up running
+    for (int i = 0; i < NCARDS; i++)
+        if (exchange_magic_number(writer_connection_settings[i].sockfd)) return 1;
+
+    // Start writer threads - these threads receive images via IB Verbs
+    if (experiment_settings.nimages_to_write > 0) {
         if (writer_settings.write_mode == JF_WRITE_HDF5)
             if (open_data_hdf5()) return 1;
 
-        writer_thread = (pthread_t *) calloc(writer_settings.nthreads, sizeof(pthread_t));
-        writer_thread_arg = (writer_thread_arg_t *) calloc(writer_settings.nthreads, sizeof(writer_thread_arg_t));
-
-        // Barrier #1 - All threads on P9 are set up running
-	for (int i = 0; i < NCARDS; i++)
-            if (exchange_magic_number(writer_connection_settings[i].sockfd)) return 1;
-
-        // Start writer threads - these threads receive images via IB Verbs
-	if (experiment_settings.nimages_to_write > 0) {
-		for (int i = 0; i < writer_settings.nthreads; i++) {
-			writer_thread_arg[i].thread_id = i / NCARDS;
-                        if (NCARDS > 1) 
-			    writer_thread_arg[i].card_id = i % NCARDS;
-                        else
-                            writer_thread_arg[i].card_id = 0;
-			int ret = pthread_create(writer_thread+i, NULL, run_writer_thread, writer_thread_arg+i);
-		}
+        for (int i = 0; i < writer_settings.nthreads; i++) {
+            writer_thread_arg[i].thread_id = i / NCARDS;
+            if (NCARDS > 1)
+                writer_thread_arg[i].card_id = i % NCARDS;
+            else
+                writer_thread_arg[i].card_id = 0;
+            int ret = pthread_create(writer_thread+i, NULL, run_writer_thread, writer_thread_arg+i);
         }
+    }
 
-        // Start metadata threads - these threads receive metadata via TCP/IP socket
-        // When started, these threads will exchange magic number again (barrier #2)
-        for (int i = 0; i < NCARDS; i++) {
-             metadata_thread_arg[i].card_id = i;
-             int ret = pthread_create(metadata_thread+i, NULL, run_metadata_thread, metadata_thread_arg+i);
-        }
-	
+    // Start metadata threads - these threads receive metadata via TCP/IP socket
+    // When started, these threads will exchange magic number again (barrier #2)
+    for (int i = 0; i < NCARDS; i++) {
+        metadata_thread_arg[i].card_id = i;
+        int ret = pthread_create(metadata_thread+i, NULL, run_metadata_thread, metadata_thread_arg+i);
+    }
+
 #ifndef OFFLINE
-        trigger_detector();
+    trigger_detector();
 #endif
-        clock_gettime(CLOCK_REALTIME, &time_start);
+    clock_gettime(CLOCK_REALTIME, &time_start);
 
-        if ((experiment_settings.pedestalG0_frames > 0) && (experiment_settings.conversion_mode == MODE_CONV))
-            time_pedestalG0 = time_start;
-        return 0;
+    if ((experiment_settings.pedestalG0_frames > 0) && (experiment_settings.conversion_mode == MODE_CONV))
+        time_pedestalG0 = time_start;
+    return 0;
 }
 
 int jfwriter_stop() {
-	if (experiment_settings.conversion_mode == MODE_QUIT)
-            return 0;
+    if (experiment_settings.conversion_mode == MODE_QUIT)
+        return 0;
 
-	if (experiment_settings.nimages_to_write > 0) {
-	    for (int i = 0; i < writer_settings.nthreads; i++)
-		int ret = pthread_join(writer_thread[i], NULL);
-	}
+    if (experiment_settings.nimages_to_write > 0) {
+        for (int i = 0; i < writer_settings.nthreads; i++)
+            int ret = pthread_join(writer_thread[i], NULL);
 
         // Data files can be closed, when all frames were written,
         // even if collection is still running
+
         if (writer_settings.write_mode == JF_WRITE_HDF5)
             close_data_hdf5();
+    }
+    // Record end time, as time when everything has ended
+    clock_gettime(CLOCK_REALTIME, &time_end);
 
-        // Record end time, as time when everything has ended
-        clock_gettime(CLOCK_REALTIME, &time_end);
-
-        // Involves barrier after collecting data
-	for (int i = 0; i < NCARDS; i++) {
-            int ret = pthread_join(metadata_thread[i], NULL);
-            if (disconnect_from_power9(i)) return 1;
-        }
-#ifndef OFFLINE        
-        close_detector();
+    // Involves barrier after collecting data
+    for (int i = 0; i < NCARDS; i++) {
+        int ret = pthread_join(metadata_thread[i], NULL);
+        if (disconnect_from_power9(i)) return 1;
+    }
+#ifndef OFFLINE
+    close_detector();
 #endif
-	if (writer_settings.HDF5_prefix != "")
-            close_master_hdf5();
-        return 0;
+    if (writer_settings.HDF5_prefix != "")
+        close_master_hdf5();
+    return 0;
 }
 
 void calc_mean_pedestal(uint16_t in[NCARDS*NPIXEL], double out[NMODULES*NCARDS]) {
@@ -154,10 +155,10 @@ void calc_mean_pedestal(uint16_t in[NCARDS*NPIXEL], double out[NMODULES*NCARDS])
         double sum = 0;
         double count = 0;
         for (size_t j = 0; j < MODULE_COLS*MODULE_LINES; j++) {
-           if (gain_pedestal.pixel_mask[i * MODULE_COLS * MODULE_LINES + j] == 0) {
-               sum += in[i * MODULE_COLS * MODULE_LINES + j] / 4.0;
-               count += 1.0;
-           }
+            if (gain_pedestal.pixel_mask[i * MODULE_COLS * MODULE_LINES + j] == 0) {
+                sum += in[i * MODULE_COLS * MODULE_LINES + j] / 4.0;
+                count += 1.0;
+            }
         }
         out[i] = sum / count;
     }
@@ -167,8 +168,8 @@ void count_bad_pixel() {
     for (size_t i = 0; i < NMODULES * NCARDS; i++) {
         size_t count = 0;
         for (size_t j = 0; j < MODULE_COLS*MODULE_LINES; j++) {
-           if (gain_pedestal.pixel_mask[i * MODULE_COLS * MODULE_LINES + j] != 0)
-              count ++;           
+            if (gain_pedestal.pixel_mask[i * MODULE_COLS * MODULE_LINES + j] != 0)
+                count ++;
         }
         bad_pixels[i] = count;
     }
@@ -185,7 +186,7 @@ int jfwriter_pedestalG0() {
 
     if (jfwriter_start() == 1) return 1;
     if (jfwriter_disarm() == 1) return 1;
-    time_pedestalG0 = time_start;    
+    time_pedestalG0 = time_start;
 
     experiment_settings = tmp_settings;
     calc_mean_pedestal(gain_pedestal.pedeG0, mean_pedestalG0);
@@ -204,8 +205,8 @@ int jfwriter_pedestalG1() {
 
     if (jfwriter_start() == 1) return 1;
     if (jfwriter_disarm() == 1) return 1;
-    time_pedestalG1 = time_start;    
-    
+    time_pedestalG1 = time_start;
+
     experiment_settings = tmp_settings;
     calc_mean_pedestal(gain_pedestal.pedeG1, mean_pedestalG1);
     count_bad_pixel();
@@ -224,7 +225,7 @@ int jfwriter_pedestalG2() {
     if (jfwriter_disarm() == 1) return 1;
 
     time_pedestalG2 = time_start;
-    
+
     experiment_settings = tmp_settings;
     calc_mean_pedestal(gain_pedestal.pedeG2, mean_pedestalG2);
     count_bad_pixel();
@@ -239,9 +240,9 @@ int jfwriter_arm() {
         && (experiment_settings.pedestalG0_frames == 0))
         if (jfwriter_pedestalG0()) return 1;
     if (((long)(time - time_pedestalG1.tv_sec) > PEDESTAL_TIME_CUTOFF)
-                || ((long)(time - time_pedestalG2.tv_sec) > PEDESTAL_TIME_CUTOFF)) {
-                if (jfwriter_pedestalG1()) return 1;
-                if (jfwriter_pedestalG2()) return 1;
+        || ((long)(time - time_pedestalG2.tv_sec) > PEDESTAL_TIME_CUTOFF)) {
+        if (jfwriter_pedestalG1()) return 1;
+        if (jfwriter_pedestalG2()) return 1;
     }
 
     writer_settings.timing_trigger = true;
