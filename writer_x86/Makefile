@@ -36,7 +36,7 @@ CXXFLAGS= -std=c++14 -Ofast -g -static-intel -xHost -ip -Wall -DUSE_ZSTD -debug 
 LDFLAGS= -Ofast -g -static-intel -xHost -ip -lm -lpthread -lz -libverbs -debug inline-debug-info -lssh $(IPPROOT)/lib/intel64/libippdc.a $(IPPROOT)/lib/intel64/libipps.a $(IPPROOT)/lib/intel64/libippcore.a
 CPPFLAGS= -I. -I../include -I../lz4 -I../zstd/lib -I${HDF5_PATH}/include -I$(PISTACHE_PATH)/include $(SLS_DETECTOR_INCLUDE) -I/usr/local/include/opencv4/
 
-WR_SRCS=Preview.o JFWriter.o NetIO.o FileIO.o WriterThread.o DetConfig.o sharedVariables.o MetadataThread.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o ../lz4/lz4.c
+WR_SRCS=ParameterIO.o Preview.o JFWriter.o NetIO.o FileIO.o WriterThread.o DetConfig.o sharedVariables.o MetadataThread.o ../IB_Transport.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o ../lz4/lz4.c
 
 all: RESTserver
 
