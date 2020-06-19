@@ -37,12 +37,12 @@ std::map<std::string, parameter_t> detector_options = {
                                [](nlohmann::json &in) { experiment_settings.count_time_detector = in.get<double>() / 1000000.0; },
                                "Internal count time of the detector"
                        }},
-        {"shutter_delay", {"ms", PARAMETER_FLOAT, 0.1, 1000.0, false,
+        {"shutter_delay", {"ms", PARAMETER_FLOAT, 0.0, 1000.0, false,
                                [](nlohmann::json &out) { out = experiment_settings.shutter_delay * 1000.0; },
                                [](nlohmann::json &in) { experiment_settings.shutter_delay = in.get<double>() / 1000.0; },
                                "Time to open/close shutter"
                        }},
-        {"beamline_delay", {"s", PARAMETER_FLOAT, 0.0001, 100.0, false,
+        {"beamline_delay", {"s", PARAMETER_FLOAT, 0.0, 100.0, false,
                                [](nlohmann::json &out) { out = experiment_settings.beamline_delay; },
                                [](nlohmann::json &in) { experiment_settings.beamline_delay = in.get<double>(); },
                                "Maximal time taken by the beamline to prepare data collection, from the moment \"arm\" command is released"
@@ -166,13 +166,44 @@ std::map<std::string, parameter_t> detector_options = {
                                [](nlohmann::json &in) { writer_settings.HDF5_prefix = in.get<std::string>(); },
                                "Name pattern for output file"
                        }},
-
+        {"omega_increment",{"deg", PARAMETER_FLOAT, 0.0, 20.0, false,
+                                [](nlohmann::json &out) { out = experiment_settings.omega_angle_per_image; },
+                                [](nlohmann::json &in) { experiment_settings.omega_angle_per_image = in.get<double>(); },
+                                "Increase of omega angle per image (0 = raster)"
+                        }},
+        {"omega_start",{"deg", PARAMETER_FLOAT, -INFINITY, INFINITY, false,
+                                   [](nlohmann::json &out) { out = experiment_settings.omega_start; },
+                                   [](nlohmann::json &in) { experiment_settings.omega_start = in.get<double>(); },
+                                   "Start omega angle"
+                           }},
         // TODO: This should be private variable - remove after development
         {"default_path",{"", PARAMETER_STRING, 0.0, 0.0, false,
                                [](nlohmann::json &out) { out = writer_settings.default_path; },
                                [](nlohmann::json &in) { writer_settings.default_path = in.get<std::string>(); },
                                "Path on the JF server to output files"
                        }},
+        {"pedestalG0_mean", {"ADU", PARAMETER_FLOAT, 0.0, 0.0, false,
+                                    [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(mean_pedestalG0[i]); },
+                                    [](nlohmann::json &in) { throw read_only_exception(); },
+                                    "Mean pedestal of gain G0 (per modules)"
+                            }},
+        {"pedestalG1_mean", {"ADU", PARAMETER_FLOAT, 0.0, 0.0, false,
+                                    [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(mean_pedestalG1[i]); },
+                                    [](nlohmann::json &in) { throw read_only_exception(); },
+                                    "Mean pedestal of gain G1 (per module)"
+                            }},
+        {"pedestalG2_mean", {"ADU", PARAMETER_FLOAT, 0.0, 0.0, false,
+                             [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(mean_pedestalG2[i]); },
+                             [](nlohmann::json &in) { throw read_only_exception(); },
+                             "Mean pedestal of gain G2 (per module)"
+            }},
+        {"bad_pixels", {"", PARAMETER_FLOAT, 0.0, 0.0, false,
+                                    [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(bad_pixels[i]); },
+                                    [](nlohmann::json &in) { throw read_only_exception(); },
+                                    "Number of bad pixels (per module)"
+                            }}
+
+
 };
 
 void set_parameter(nlohmann::json &j) {
