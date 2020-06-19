@@ -24,7 +24,7 @@ class App extends Component {
   }
 
   updateREST() {
-    fetch('http://' + window.location.hostname + ':5232/', {crossDomain:true})
+    fetch('http://' + window.location.hostname + ':5232/config', {crossDomain:true})
     .then(handleErrors)
     .then(res => res.json())
     .then(data => {
@@ -32,9 +32,9 @@ class App extends Component {
          this.setState({ connected: true});
          this.setState({ params: [
               {desc: "Frame time", value: formatTime(data.frame_time)},
-              {desc: "Frame time (internal)", value: formatTime(data.frame_time_detector)},
+              {desc: "Frame time (internal)", value: formatTime(data.frame_time_detector/1e6)},
               {desc: "Count time ", value: formatTime(data.count_time)},
-              {desc: "Count time (internal)", value: formatTime(data.count_time_detector)},
+              {desc: "Count time (internal)", value: formatTime(data.count_time_detector/1e6)},
               {desc: "Frame summation", value: data.summation},
               {desc: "Compression", value: data.compression},
               {desc: "Beam center x", value: data.beam_center_x + " pxl"},
@@ -42,53 +42,22 @@ class App extends Component {
               {desc: "Detector distance", value: data.detector_distance + " mm"},
               {desc: "Beamline delay (max)", value: formatTime(data.beamline_delay)},
               {desc: "Shutter delay", value: formatTime(data.shutter_delay)},
-              {desc: "Energy", value: data.energy_in_keV + " keV"},
+              {desc: "Energy", value: data.photon_energy + " keV"},
               {desc: "Pedestal G0 frames", value: data.pedestalG0_frames},
               {desc: "Pedestal G1 frames", value: data.pedestalG1_frames},
               {desc: "Pedestal G2 frames", value: data.pedestalG2_frames},
               ]});
-         this.setState({modules: [
-              {name: "Module 6", 
-               bad_pixels: data.bad_pixels_mod6, 
-               meanG0: data.pedestalG0_mean_mod6,  
-               meanG1: data.pedestalG1_mean_mod6,  
-               meanG2: data.pedestalG2_mean_mod6},
-              {name: "Module 7", 
-               bad_pixels: data.bad_pixels_mod7, 
-               meanG0: data.pedestalG0_mean_mod7,  
-               meanG1: data.pedestalG1_mean_mod7,  
-               meanG2: data.pedestalG2_mean_mod7},
-              {name: "Module 4", 
-               bad_pixels: data.bad_pixels_mod4, 
-               meanG0: data.pedestalG0_mean_mod4,  
-               meanG1: data.pedestalG1_mean_mod4,  
-               meanG2: data.pedestalG2_mean_mod4},
-              {name: "Module 5", 
-               bad_pixels: data.bad_pixels_mod5, 
-               meanG0: data.pedestalG0_mean_mod5,  
-               meanG1: data.pedestalG1_mean_mod5,  
-               meanG2: data.pedestalG2_mean_mod5},
-              {name: "Module 3", 
-               bad_pixels: data.bad_pixels_mod3, 
-               meanG0: data.pedestalG0_mean_mod3,  
-               meanG1: data.pedestalG1_mean_mod3,  
-               meanG2: data.pedestalG2_mean_mod3},
-              {name: "Module 2", 
-               bad_pixels: data.bad_pixels_mod2, 
-               meanG0: data.pedestalG0_mean_mod2,  
-               meanG1: data.pedestalG1_mean_mod2,  
-               meanG2: data.pedestalG2_mean_mod2},
-              {name: "Module 1", 
-               bad_pixels: data.bad_pixels_mod1, 
-               meanG0: data.pedestalG0_mean_mod1,  
-               meanG1: data.pedestalG1_mean_mod1,  
-               meanG2: data.pedestalG2_mean_mod1},
-              {name: "Module 0", 
-               bad_pixels: data.bad_pixels_mod0, 
-               meanG0: data.pedestalG0_mean_mod0,  
-               meanG1: data.pedestalG1_mean_mod0,  
-               meanG2: data.pedestalG2_mean_mod0},
-            ]});
+         var i;
+         var in_modules = []
+         for (i = 0; i < 8; i++) {
+             var z = 2 * ( 3 - Math.floor(i / 2)) + i % 2;
+            in_modules.push({name: "Module " + z,
+                bad_pixels: data.bad_pixels[z],
+                meanG0: data.pedestalG0_mean[z],
+                meanG1: data.pedestalG1_mean[z],
+                meanG2: data.pedestalG2_mean[z]})
+         }
+         this.setState({modules: in_modules});
     })
     .catch(error => {
         this.setState({value: {connected: false}})
@@ -124,7 +93,7 @@ class App extends Component {
                 <iframe title="grafana" src="http://mx-jungfrau-1:3000/d-solo/npmZQ7kMk/servers?orgId=1&theme=light&panelId=12" width="100%" height="250" frameBorder="0"/>
                 </div>
             :
-                <Preview></Preview>}
+                <Preview/>}
             <br/></div>
          :
             <h1> Detector server not running </h1>}

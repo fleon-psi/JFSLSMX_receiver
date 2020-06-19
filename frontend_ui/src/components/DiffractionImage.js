@@ -2,7 +2,6 @@ import React, {Component} from 'react';
 import Grid from '@material-ui/core/Grid';
 import Slider from '@material-ui/core/Slider';
 import Switch from '@material-ui/core/Switch';
-import Typography from '@material-ui/core/Typography';
 import PinchZoomPan from "react-responsive-pinch-zoom-pan";
 import SpotFindingPlot from './SpotFindingPlot.js';
 
@@ -46,11 +45,9 @@ class Preview extends Component {
             </div>
           </Grid>
           <Grid item xs={5}>
-            <Typography> Contrast </Typography>
-            <Slider defaultValue={10.0} min={1.0} max={200} onChange={this.sliderMoved} valueLabelDisplay="auto" style= {{width: 300}} />
-            <Typography> Log scale </Typography>
-            <Switch checked={this.state.logarithmic} onChange={this.handleChange} name="logarithmic" />
-            <Typography> Spot count vs. rotation angle </Typography>
+            <Slider defaultValue={10.0} min={1.0} max={200} onChange={this.sliderMoved} valueLabelDisplay="auto"/><br/>
+            <Switch checked={this.state.logarithmic} onChange={this.handleChange} name="logarithmic" />Log scale<br/>
+            <br/><br/>
             <SpotFindingPlot/>
           </Grid>
         </Grid>
