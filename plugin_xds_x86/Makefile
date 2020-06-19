@@ -29,8 +29,8 @@ CXX=icpc
 CC=icc
 CFLAGS=-g -std=c99 -static-intel -Ofast -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info -fPIC -DWITH_IPP
 CXXFLAGS= -std=c++14 -static-intel -Ofast -xHost -ip -Wall -DUSE_ZSTD -debug inline-debug-info -fPIC -DOFFLINE -DWITH_IPP
-LDFLAGS= -static-intel -Ofast -xHost -ip -debug inline-debug-info -Wl,--as-needed -lippdc -lipps -lippcore
-CPPFLAGS= -I. -I../include -I../lz4 -I../zstd/lib -I${HDF5_PATH}/include
+LDFLAGS= -static-intel -Ofast -xHost -ip -debug inline-debug-info -Wl,--as-needed -lippdc -lipps -lippcore -lz
+CPPFLAGS= -I. -I../include -I../lz4 -I../zstd/lib -I${HDF5_PATH}/include 
 
 PLUGIN_SRCS=plugin.o ../bitshuffle/bshuf_h5filter.o  ../bitshuffle/bitshuffle.o ../bitshuffle/bitshuffle_core.o ../bitshuffle/iochain.o ../lz4/lz4.o
 

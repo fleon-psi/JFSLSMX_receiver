@@ -17,8 +17,11 @@
 #ifndef JFWRITER_H_
 #define JFWRITER_H_
 
+#include "../json/single_include/nlohmann/json.hpp"
 #include <ctime>
 #include <vector>
+#include <map>
+#include <set>
 #include <hdf5.h>
 
 #ifndef OFFLINE
@@ -49,10 +52,11 @@ struct writer_settings_t {
 	std::string HDF5_prefix;    // Files are saved in default_path + "/" + HDF5_prefix + "_master.h5" and "_data.h5" 
 	int images_per_file;        // Images saved in a single file
 	int nthreads;               // Number of threads per card
-        compression_t compression;  // Compression
-        write_mode_t write_mode;    // Writing mode
-        bool timing_trigger;        // Timing mode (true = external triger, false = internal trigger)
-        bool hdf18_compat;          // True = (compatibility with HDF5 1.8), False = (use SWMR and VDS)
+	compression_t compression;  // Compression
+    write_mode_t write_mode;    // Writing mode
+    bool timing_trigger;        // Timing mode (true = external triger, false = internal trigger)
+    bool hdf18_compat;          // True = (compatibility with HDF5 1.8), False = (use SWMR and VDS)
+    std::string tracking_id;
 };
 
 extern writer_settings_t writer_settings;
@@ -80,7 +84,29 @@ struct gain_pedestal_t {
 	uint16_t pedeG1[NCARDS*NPIXEL];
 	uint16_t pedeG2[NCARDS*NPIXEL];
 	uint16_t pedeG0[NCARDS*NPIXEL];
-        uint16_t pixel_mask[NCARDS*NPIXEL];
+	uint16_t pixel_mask[NCARDS*NPIXEL];
+};
+
+enum parameter_type_t {
+    PARAMETER_FLOAT, PARAMETER_BOOL, PARAMETER_UINT, PARAMETER_STRING
+};
+
+struct parameter_t {
+    std::string units;
+    parameter_type_t type;
+    double min;
+    double max;
+    bool read_only;
+    void (*output)(nlohmann::json &out);
+    void (*input)(nlohmann::json &in);
+    std::string description;
+    std::set<std::string> allowed_string_values;
+};
+
+extern std::map<std::string, parameter_t> detector_options;
+
+struct read_only_exception : public std::exception {
+
 };
 
 void *run_writer_thread(void* thread_arg);
