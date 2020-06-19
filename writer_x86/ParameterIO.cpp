@@ -112,6 +112,26 @@ std::map<std::string, parameter_t> detector_options = {
                                [](nlohmann::json &in) { experiment_settings.detector_distance = in.get<double>(); },
                                "Y beam center positions (in expanded detector coordinates)"
                        }},
+        {"total_flux",{"e/s", PARAMETER_FLOAT, 0.0, INFINITY, false,
+                                     [](nlohmann::json &out) { out = experiment_settings.total_flux; },
+                                     [](nlohmann::json &in) { experiment_settings.total_flux = in.get<double>(); },
+                                     "Total photon flux on the sample"
+                             }},
+        {"beam_size_x",{"um", PARAMETER_FLOAT, 0.0, 5000.0, false,
+                              [](nlohmann::json &out) { out = experiment_settings.beam_size_x; },
+                              [](nlohmann::json &in) { experiment_settings.beam_size_x = in.get<double>(); },
+                              "Beam size in horizontal direction"
+                      }},
+        {"beam_size_y",{"um", PARAMETER_FLOAT, 0.0, 5000.0, false,
+                               [](nlohmann::json &out) { out = experiment_settings.beam_size_y; },
+                               [](nlohmann::json &in) { experiment_settings.beam_size_y = in.get<double>(); },
+                               "Beam size in vertical direction"
+                       }},
+        {"sample_temperature",{"K", PARAMETER_FLOAT, 0.0, 500.0, false,
+                               [](nlohmann::json &out) { out = experiment_settings.sample_temperature; },
+                               [](nlohmann::json &in) { experiment_settings.sample_temperature = in.get<double>(); },
+                               "Sample temperature"
+                       }},
         {"spot_finding",{"", PARAMETER_BOOL, 0.0, 0.0, false,
                                [](nlohmann::json &out) { out = experiment_settings.enable_spot_finding; },
                                [](nlohmann::json &in) {  experiment_settings.enable_spot_finding = in.get<bool>(); },
@@ -122,6 +142,16 @@ std::map<std::string, parameter_t> detector_options = {
                                [](nlohmann::json &in) {  experiment_settings.strong_pixel = in.get<double>(); },
                                "Strong pixel parameter for spot finding"
                        }},
+        {"spot_finding_max_depth",{"", PARAMETER_UINT, 1.0, NIMAGES_PER_STREAM, false,
+                                             [](nlohmann::json &out) { out = experiment_settings.max_spot_depth; },
+                                             [](nlohmann::json &in) {  experiment_settings.max_spot_depth = in.get<uint16_t>(); },
+                                             "Spots present on more images than this value are discarded"
+                                     }},
+        {"spot_finding_min_pixel",{"", PARAMETER_UINT, 1.0, 5000.0, false,
+                                          [](nlohmann::json &out) { out = experiment_settings.min_pixels_per_spot; },
+                                          [](nlohmann::json &in) {  experiment_settings.min_pixels_per_spot = in.get<uint16_t>(); },
+                                          "Spots with less pixels than this value are discarded"
+                                  }},
         {"spot_finding_dimensions", {"", PARAMETER_STRING, 0.0, 0.0, false,
                                [](nlohmann::json &out) { experiment_settings.connect_spots_between_frames? out = "3D": out="2D";},
                                [](nlohmann::json &in) { if (in.get<std::string>() == "2D") experiment_settings.connect_spots_between_frames = false;
@@ -182,22 +212,22 @@ std::map<std::string, parameter_t> detector_options = {
                                [](nlohmann::json &in) { writer_settings.default_path = in.get<std::string>(); },
                                "Path on the JF server to output files"
                        }},
-        {"pedestalG0_mean", {"ADU", PARAMETER_FLOAT, 0.0, 0.0, false,
+        {"pedestalG0_mean", {"ADU", PARAMETER_FLOAT, 0.0, 0.0, true,
                                     [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(mean_pedestalG0[i]); },
                                     [](nlohmann::json &in) { throw read_only_exception(); },
                                     "Mean pedestal of gain G0 (per modules)"
                             }},
-        {"pedestalG1_mean", {"ADU", PARAMETER_FLOAT, 0.0, 0.0, false,
+        {"pedestalG1_mean", {"ADU", PARAMETER_FLOAT, 0.0, 0.0, true,
                                     [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(mean_pedestalG1[i]); },
                                     [](nlohmann::json &in) { throw read_only_exception(); },
                                     "Mean pedestal of gain G1 (per module)"
                             }},
-        {"pedestalG2_mean", {"ADU", PARAMETER_FLOAT, 0.0, 0.0, false,
+        {"pedestalG2_mean", {"ADU", PARAMETER_FLOAT, 0.0, 0.0, true,
                              [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(mean_pedestalG2[i]); },
                              [](nlohmann::json &in) { throw read_only_exception(); },
                              "Mean pedestal of gain G2 (per module)"
             }},
-        {"bad_pixels", {"", PARAMETER_FLOAT, 0.0, 0.0, false,
+        {"bad_pixels", {"", PARAMETER_FLOAT, 0.0, 0.0, true,
                                     [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(bad_pixels[i]); },
                                     [](nlohmann::json &in) { throw read_only_exception(); },
                                     "Number of bad pixels (per module)"
