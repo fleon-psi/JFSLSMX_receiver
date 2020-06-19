@@ -23,7 +23,6 @@ class SpotFindingPlot extends Component {
         fetch('http://' + window.location.hostname + ':5232/spot_count', {crossDomain:true})
         .then(res => res.json())
         .then( data1 => this.setState({ spots: data1}) );
-        console.log(this.state.sequence)
         }
     });
     

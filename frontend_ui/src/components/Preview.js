@@ -35,8 +35,10 @@ class Preview extends Component {
 
   render() {
      return <div style={{ margin: 'auto' }}>
+
         <Grid container spacing={3}>
-          <Grid item xs={7}>
+          <Grid item xs={1} />
+          <Grid item xs={6}>
             <div style={{  width: '1030px', height: '1028px' }}>
               <PinchZoomPan maxScale={4.0}>
                 {this.state.logarithmic?
@@ -45,7 +47,7 @@ class Preview extends Component {
               </PinchZoomPan>
             </div>
           </Grid>
-          <Grid item xs={5}>
+          <Grid item xs={4}>
             <Typography> Contrast </Typography>
             <Slider defaultValue={10.0} min={1.0} max={200} onChange={this.sliderMoved} valueLabelDisplay="auto" style= {{width: 300}} />
             <Typography> Log scale </Typography>
@@ -53,6 +55,7 @@ class Preview extends Component {
             <Typography> Spot count vs. rotation angle </Typography>
             <SpotFindingPlot/>
           </Grid>
+          <Grid item xs={1}/>
         </Grid>
         </div>;
   }
