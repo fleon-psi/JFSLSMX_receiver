@@ -90,7 +90,9 @@ struct ib_settings_t {
 
 // Definition of Bragg spot
 struct spot_t {
-    double x,y,z;     // Coordinates in "data" array (not exactly detector configuration)
+    float x,y,z;      // Coordinates in "data" array (not exactly detector configuration)
+    float d;          // Resolution [in Angstrom]
+    float q[3];       // Reciprocal vector for "node", see Gevorkov et al. 2019
     uint64_t photons; // total photon count
     uint64_t pixels;  // number of pixels
     uint64_t depth;   // on how many frames the spot is present
