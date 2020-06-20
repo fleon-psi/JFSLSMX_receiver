@@ -68,8 +68,7 @@ extern receiver_settings_t receiver_settings;
 struct strong_pixel {
     int16_t col;           // column
     int16_t line;          // line (relative to chunk (2x vertical modules) read by GPU)
-    uint32_t photons;      // intensity of the pixel
-    float photons_minus_bkg_sum; // divide by (2*NBX+1) * (2*NBY+1) to get background subtracted photon count
+    float photons;      // intensity of the pixel divide by (2*NBX+1) * (2*NBY+1) to get background subtracted photon count
 };
 
 // Buffers for communication with the FPGA

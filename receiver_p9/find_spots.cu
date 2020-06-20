@@ -99,8 +99,7 @@ __global__ void find_spots_colspot(T *in, strong_pixel *out, float strong, int N
                        // Save line, column and photon count in output table
                        out[strong_id0+strong_id].line = line;
                        out[strong_id0+strong_id].col = col;
-                       out[strong_id0+strong_id].photons = in[(line0 + line)*COLS+col];
-                       out[strong_id0+strong_id].photons_minus_bkg_sum = in_minus_mean;
+                       out[strong_id0+strong_id].photons = in_minus_mean;
                        strong_id = (strong_id + 1 ) % MAX_STRONG;
                     }
 

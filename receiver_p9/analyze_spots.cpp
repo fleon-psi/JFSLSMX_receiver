@@ -43,7 +43,7 @@ void merge_spots_new_frame(spot_t &spot1, const spot_t spot2) {
 }
 
 typedef std::pair<int16_t, int16_t> coordxy_t; // This is simply (x, y)
-typedef std::map<coordxy_t, uint64_t> strong_pixel_map_t;
+typedef std::map<coordxy_t, float> strong_pixel_map_t;
 // This is mapping (x,y) --> intensity
 // it allows to find if there is spot in (x,y) in log time
 typedef std::vector<strong_pixel_map_t> strong_pixel_maps_t;
@@ -55,16 +55,16 @@ typedef std::vector<strong_pixel_map_t> strong_pixel_maps_t;
 spot_t add_pixel(strong_pixel_maps_t &strong_pixel_maps, size_t i, strong_pixel_map_t::iterator &it, bool connect_frames) {
     spot_t ret_value;
 
-    uint64_t photons = it->second;
+    float photons = it->second;
     int16_t col = it->first.first;
     int16_t line = it->first.second;
 
     strong_pixel_maps[i].erase(it); // Remove strong pixel from the dictionary, so it is not processed again
 
-    ret_value.x = col * (double)photons; // position is weighted by number of photon counts
-    ret_value.y = (line + (i%2) * LINES) * (double)photons;
+    ret_value.x = col * photons; // position is weighted by number of photon counts
+    ret_value.y = (line + (i%2) * LINES) * photons;
     // Y accounts for the actual module
-    ret_value.z = (i / 2) * (double)photons;
+    ret_value.z = (i / 2) * photons;
     ret_value.photons = photons;
     ret_value.pixels = 1;
     ret_value.depth = 0;
@@ -120,7 +120,8 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
         while ((k < MAX_STRONG) && (host_out[addr + k].col >= 0) && (host_out[addr + k].line >= 0) && (host_out[addr+k].photons > 0)) {
               coordxy_t key = coordxy_t(host_out[addr + k].col, host_out[addr + k].line);
               if (bad_pixels.find(key) == bad_pixels.end())
-                  strong_pixel_maps[i][key] = host_out[addr + k].photons_minus_bkg_sum / ((2*NBX+1)*(2*NBY+1));
+//                  strong_pixel_maps[i][key] = host_out[addr + k].photons / ((2*NBX+1)*(2*NBY+1));
+                  strong_pixel_maps[i][key] = host_out[addr + k].photons;
               k++;
         }
     }
