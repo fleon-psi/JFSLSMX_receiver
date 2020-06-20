@@ -421,7 +421,7 @@ void transform_and_write_mask(hid_t grp) {
     }
 
     // Copy horizontal multi-pixel lines
-    for (int i = 0; i < NMODULES / 2; i ++) {
+    for (int i = 0; i < NMODULES * NCARDS / 2; i ++) {
         memcpy(pixel_mask + (514 * i + 256) * 1030 * 2, pixel_mask + (514 * i + 255) * 1030 * 2, 2 * 1030 * sizeof(uint32_t));
         memcpy(pixel_mask + (514 * i + 257) * 1030 * 2, pixel_mask + (514 * i + 258) * 1030 * 2, 2 * 1030 * sizeof(uint32_t));
     }
