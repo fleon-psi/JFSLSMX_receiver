@@ -58,3 +58,4 @@ pthread_mutex_t writer_threads_done_mutex[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 pthread_cond_t writer_threads_done_cond[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 int writer_threads_done[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 
+std::set<std::pair<int16_t, int16_t> > bad_pixels;

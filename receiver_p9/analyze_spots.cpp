@@ -119,7 +119,8 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
         // Photons equal zero could mean that kernel was not at all executed
         while ((k < MAX_STRONG) && (host_out[addr + k].col >= 0) && (host_out[addr + k].line >= 0) && (host_out[addr+k].photons > 0)) {
               coordxy_t key = coordxy_t(host_out[addr + k].col, host_out[addr + k].line);
-              strong_pixel_maps[i][key] = host_out[addr + k].photons_minus_bkg_sum / ((2*NBX+1)*(2*NBY+1));
+              if (bad_pixels.find(key) == bad_pixels.end())
+                  strong_pixel_maps[i][key] = host_out[addr + k].photons_minus_bkg_sum / ((2*NBX+1)*(2*NBY+1));
               k++;
         }
     }

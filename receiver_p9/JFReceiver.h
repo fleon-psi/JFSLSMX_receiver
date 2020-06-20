@@ -18,6 +18,7 @@
 #define _JFRECEIVER_H
 
 #include <vector>
+#include <set>
 
 #include "../include/JFApp.h"
 #define FRAME_LIMIT 1000000L
@@ -134,6 +135,7 @@ extern pthread_mutex_t writer_threads_done_mutex[NCUDA_STREAMS*CUDA_TO_IB_BUFFER
 extern pthread_cond_t writer_threads_done_cond[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 extern int writer_threads_done[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 
+extern std::set<std::pair<int16_t, int16_t> > bad_pixels;
 void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool connect_frames, size_t images, size_t image0);
 
 #endif

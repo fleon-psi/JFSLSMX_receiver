@@ -187,6 +187,21 @@ void save_pedestal(std::string fname) {
 	}
 }
 
+void update_bad_pixel_list() {
+    bad_pixels.clear();
+    for (int i = 0; i < NPIXEL; i++) {
+        if (gain_pedestal_data[6*NPIXEL+i] != 0) {
+            size_t module = i / (MODULE_LINES * MODULE_COLS);
+            size_t line = (i / MODULE_LINES) % MODULE_COLS;
+            size_t column = i % (MODULE_COLS * MODULE_LINES);
+            uint16_t line_out = (513L - line - (line / 256) * 2L + 514L * (3 - (module / 2))) * 2L + module % 2;
+            uint16_t column_out = column + (column / 256) * 2L;
+            bad_pixels.insert(std::pair<int16_t, int16_t>(column_out, line_out));
+        }
+    }
+}
+
+
 // Establish TCP/IP server to communicate with writer
 int TCP_server(uint16_t port) {
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -425,7 +440,8 @@ int main(int argc, char **argv) {
 	   send(accepted_socket, online_statistics, sizeof(online_statistics_t), 0);
            // Send gain, pedestal and pixel mask
 	   send(accepted_socket, gain_pedestal_data, 7*NPIXEL*sizeof(uint16_t), 0);
-
+        // Update bad pixel pixel list for spot finding;
+            update_bad_pixel_list();
            // Reset QP
            switch_to_reset(ib_settings);
            switch_to_init(ib_settings);
