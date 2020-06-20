@@ -699,7 +699,7 @@ int write_spots() {
         tmp[i]   = spots[i].depth;
     saveDouble1D(grp, "spot_depth", tmp, "", spots.size());
 
-    tmp = (double *) recalloc(tmp, 2 * spots.size()*sizeof(double));
+    tmp = (double *) realloc(tmp, 2 * spots.size()*sizeof(double));
 
     for (int i = 0; i < spots.size(); i++) {
         tmp[2*i]     = spots[i].x;
@@ -707,7 +707,7 @@ int write_spots() {
     }
     saveDouble2D(grp, "spot_coord", tmp, "", spots.size(), 2);
 
-    tmp = (double *) recalloc(tmp, 3 * spots.size()*sizeof(double));
+    tmp = (double *) realloc(tmp, 3 * spots.size()*sizeof(double));
 
     for (int i = 0; i < spots.size(); i++) {
         tmp[3*i]     = spots[i].q[0];
