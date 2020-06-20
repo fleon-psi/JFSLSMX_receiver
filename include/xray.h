@@ -17,16 +17,17 @@
 #ifndef _XRAY_H
 #define _XRAY_H
 
+#include "JFApp.h"
+
 // Lab is in mm
-// TODO: gaps and pixel size need to be declared in common header!
 // TODO: Ensure signs are OK
 inline void detector_to_lab(float x, float y, float lab[3]) {
-    float x_with_gaps = x + int(x/1030) * 9;
-    float y_with_gaps = y + int(y/514) * 36;
+    float x_with_gaps = x + int(x/1030) * VERTICAL_GAP_PIXELS;
+    float y_with_gaps = y + int(y/514) * HORIZONTAL_GAP_PIXELS;
     float x_beam_coord = x_with_gaps - experiment_settings.beam_x;
     float y_beam_coord = y_with_gaps - experiment_settings.beam_y;
-    lab[0] = x_beam_coord * 0.075;
-    lab[1] = y_beam_coord * 0.075;
+    lab[0] = x_beam_coord * PIXEL_SIZE_IN_MM;
+    lab[1] = y_beam_coord * PIXEL_SIZE_IN_MM;
     lab[2] = experiment_settings.detector_distance;
 }
 
@@ -54,13 +55,13 @@ inline void reciprocal_rotate(float p0[3], float p[3], float omega_in_radian) {
 }
 
 inline float get_resolution(float lab[3]) {
-    float wavelength = 12.398 / (experiment_settings.energy_in_keV);
+    float wavelength =  WVL_1A_IN_KEV / (experiment_settings.energy_in_keV);
     float beam_path = sqrt(lab[0]*lab[0] + lab[1]*lab[1] + lab[2]*lab[2]);
     // Assumes planar detector, 90 deg towards beam
     float cos_2theta = beam_path / lab[2];
     // cos(2theta) = cos(theta)^2 - sin(theta)^2
     // cos(2theta) = 1 - 2*sin(theta)^2
-    // Techinically two solutions for two theta, but it makes sense only to take positive one in this case
+    // Technically two solutions for two theta, but it makes sense only to take positive one in this case
     float sin_theta = sqrt((1-cos_2theta)/2);
     return wavelength / (2*sin_theta);
 }

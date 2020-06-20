@@ -1,3 +1,19 @@
+/*
+ * Copyright 2020 Paul Scherrer Institute
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include <sys/stat.h>
 #include <string>
 #include <iostream>
@@ -9,16 +25,6 @@
 #include "../bitshuffle/bshuf_h5filter.h"
 
 #include "JFWriter.h"
-
-#define SENSOR_THICKNESS_IN_UM 320.0
-#define PIXEL_SIZE_IN_UM        75.0
-#define PIXEL_SIZE_IN_MM       (PIXEL_SIZE_IN_UM/1000.0)
-#define DETECTOR_NAME          "JF4M"
-#define SOURCE_NAME_SHORT      "SLS"
-#define SOURCE_NAME            "Swiss Light Source"
-#define INSTRUMENT_NAME        "X06DA"
-#define INSTRUMENT_NAME_SHORT  "PXIII"
-#define SENSOR_MATERIAL        "Si"
 
 #define HDF5_ERROR(ret,func) if (ret) printf("%s(%d) %s: err = %d\n",__FILE__,__LINE__, #func, ret), exit(ret)
 
@@ -429,8 +435,8 @@ void write_metrology() {
     double detectorCenter[3] = {0.0, 0.0, 0.0};
 
     for (int i = 0; i < NMODULES*NCARDS; i ++) {
-        double corner_x = (i%2) * (1030 + 8); // +GAP
-        double corner_y = (i/2) * (514 + 36); // +GAP
+        double corner_x = (i%2) * (1030 + VERTICAL_GAP_PIXELS); // +GAP
+        double corner_y = (i/2) * (514 + HORIZONTAL_GAP_PIXELS); // +GAP
         // 1. Find module corner in lab coordinates, based on pixel coordinates
         moduleOrigin[i][0] = (corner_x - experiment_settings.beam_x) * PIXEL_SIZE_IN_MM;
         moduleOrigin[i][1] = (corner_y - experiment_settings.beam_y) * PIXEL_SIZE_IN_MM;
@@ -793,15 +799,15 @@ int close_master_hdf5() {
     H5Gclose(grp);
 
     grp = createGroup(master_file_id, "/entry/instrument/detector/detectorSpecific/adu_to_photon","NXcollection");
-    saveUInt16_3D(grp, "G0", gain_pedestal.gainG0, 1024, 512, NMODULES * NCARDS, 1.0/(16384.0*512.0));
-    saveUInt16_3D(grp, "G1", gain_pedestal.gainG1, 1024, 512, NMODULES * NCARDS, -1.0/8192);
-    saveUInt16_3D(grp, "G2", gain_pedestal.gainG2, 1024, 512, NMODULES * NCARDS, -1.0/8192);
+    saveUInt16_3D(grp, "G0", gain_pedestal.gainG0, MODULE_COLS, MODULE_LINES, NMODULES * NCARDS, 1.0/(16384.0*512.0));
+    saveUInt16_3D(grp, "G1", gain_pedestal.gainG1, MODULE_COLS, MODULE_LINES, NMODULES * NCARDS, -1.0/8192);
+    saveUInt16_3D(grp, "G2", gain_pedestal.gainG2, MODULE_COLS, MODULE_LINES, NMODULES * NCARDS, -1.0/8192);
     H5Gclose(grp);
 
     grp = createGroup(master_file_id, "/entry/instrument/detector/detectorSpecific/pedestal_in_adu","NXcollection");
-    saveUInt16_3D(grp, "G0", gain_pedestal.pedeG0, 1024, 512, NMODULES * NCARDS, 0.25);
-    saveUInt16_3D(grp, "G1", gain_pedestal.pedeG1, 1024, 512, NMODULES * NCARDS, 0.25);
-    saveUInt16_3D(grp, "G2", gain_pedestal.pedeG2, 1024, 512, NMODULES * NCARDS, 0.25);
+    saveUInt16_3D(grp, "G0", gain_pedestal.pedeG0, MODULE_COLS, MODULE_LINES, NMODULES * NCARDS, 0.25);
+    saveUInt16_3D(grp, "G1", gain_pedestal.pedeG1, MODULE_COLS, MODULE_LINES, NMODULES * NCARDS, 0.25);
+    saveUInt16_3D(grp, "G2", gain_pedestal.pedeG2, MODULE_COLS, MODULE_LINES, NMODULES * NCARDS, 0.25);
     H5Gclose(grp);
 
     if (experiment_settings.enable_spot_finding) write_spots();

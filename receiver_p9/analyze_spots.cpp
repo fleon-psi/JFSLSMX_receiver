@@ -19,7 +19,7 @@
 #include "JFReceiver.h"
 #include "../include/xray.h"
 
-// CPU part
+// CPU part of spot finding
 // (recursion will not fit well to GPU)
 // Constructing spot from strong pixels
 
@@ -107,8 +107,8 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
     // there is one mpa per fragment analyzed by GPU (2 horizontally connected modules)
     strong_pixel_maps_t strong_pixel_maps = strong_pixel_maps_t(images*2); 
 
-    float one_over_wavelength = experiment_settings.energy_in_keV / 12.398; // [A^-1]
-    float omega_increment_in_radian = experiment_settings.omega_angle_per_image * 3.1415926 / 180.0;
+    float one_over_wavelength = experiment_settings.energy_in_keV /  WVL_1A_IN_KEV; // [A^-1]
+    float omega_increment_in_radian = experiment_settings.omega_angle_per_image * M_PI / 180.0;
 
     // Transfer strong pixels into dictionary
     for (size_t i = 0; i < images*2; i++) {
@@ -144,18 +144,19 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
           spot.d = get_resolution(lab);
 
           // Get reciprocal coordinates of spot
+          // For 3D spot-finding/indexing one needs to "rotate" reciprocal space vectors
+          // back to omega = 0
           if (omega_increment_in_radian != 0.0) {
               float p[3];
               lab_to_reciprocal(p, lab, one_over_wavelength);
               reciprocal_rotate(spot.q, p, omega_increment_in_radian * spot.z);
           } else
               lab_to_reciprocal(spot.q, lab, one_over_wavelength);
-
-          //TODO 100 frames per spot is arbitrary limit - these need to be defined by the experiment settings
+          // Check for conditions - generally spots covering too many frames or to few pixels are suspicious
           if ((spot.pixels > experiment_settings.min_pixels_per_spot)
               && (spot.depth < experiment_settings.max_spot_depth))
                   spots.push_back(spot);
-          iterator = strong_pixel_maps[i].begin(); // Get first unprocessed spot in this frame
+          iterator = strong_pixel_maps[i].begin(); // Get first yet unprocessed spot in this frame
       }
     }
 }
