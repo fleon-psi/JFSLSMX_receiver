@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include "JFReceiver.h"
+#include "../include/xray.h"
 
 // Maximum number of strong pixel in 2 veritcal modules
 // if there are more pixels, these will be overwritten
@@ -120,6 +121,7 @@ __global__ void find_spots_colspot(T *in, strong_pixel *out, float strong, int N
                        out[strong_id0+strong_id].line = line;
                        out[strong_id0+strong_id].col = col;
                        out[strong_id0+strong_id].photons = in[(line0 + line)*COLS+col];
+                       out[strong_id0+strong_id].photons_minus_bkg_sum = in_minus_mean;
                        strong_id = (strong_id + 1 ) % MAX_STRONG;
                     }
 
@@ -313,7 +315,7 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
         // Photons equal zero could mean that kernel was not at all executed
         while ((k < MAX_STRONG) && (host_out[addr + k].col >= 0) && (host_out[addr + k].line >= 0) && (host_out[addr+k].photons > 0)) {
               coordxy_t key = coordxy_t(host_out[addr + k].col, host_out[addr + k].line);
-              strong_pixel_maps[i][key] = host_out[addr + k].photons;
+              strong_pixel_maps[i][key] = host_out[addr + k].photons_minus_bkg_sum / ((2*NBX+1)*(2*NBY+1));
               k++;
         }
     }
@@ -322,15 +324,25 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
       strong_pixel_map_t::iterator iterator = strong_pixel_maps[i].begin();
       while (iterator != strong_pixel_maps[i].end()) {
           spot_t spot = add_pixel(strong_pixel_maps, i, iterator, connect_frames);
-          // Apply pixel count cut-off and cut-off of number of frames, which spot can span 
+          // Apply pixel count cut-off and cut-off of number of frames, which spot can span
           // (spots present in most frames, are likely to be either bad pixels or in spindle axis)
           spot.x = spot.x / spot.photons;
           // Account for the fact, that each process handles only part of the detector
           spot.y = spot.y / spot.photons + (NCARDS - receiver_settings.gpu_device - 1) * 2 * LINES;
           // Account for frame number
           spot.z = spot.z / spot.photons + image0;
+
+          // Find lab coordinates of the pixel
+          float lab[3];
+          detector_to_lab(spot.x, spot.y, lab);
+
+          // Get resolution
+          spot.d = get_resolution(lab);
+
           //TODO 100 frames per spot is arbitrary limit - these need to be defined by the experiment settings
-          if ((spot.pixels > 3) && (spot.depth < 100)) spots.push_back(spot);
+          if ((spot.pixels > experiment_settings.min_pixels_per_spot)
+              && (spot.depth < experiment_settings.max_spot_depth))
+                  spots.push_back(spot);
           iterator = strong_pixel_maps[i].begin(); // Get first unprocessed spot in this frame
       }
     }
