@@ -97,6 +97,11 @@ std::map<std::string, parameter_t> detector_options = {
                                [](nlohmann::json &in) { experiment_settings.energy_in_keV = in.get<double>(); },
                                "Expected energy of incoming photons"
                        }},
+        {"wavelength",{"A", PARAMETER_FLOAT, WVL_1A_IN_KEV / 30.0, WVL_1A_IN_KEV / 3.0, false,
+                                 [](nlohmann::json &out) { out = WVL_1A_IN_KEV / experiment_settings.energy_in_keV; },
+                                 [](nlohmann::json &in) { experiment_settings.energy_in_keV = WVL_1A_IN_KEV / in.get<double>(); },
+                                 "Expected energy of incoming photons"
+                         }},
         {"beam_center_x",{"pxl", PARAMETER_FLOAT, -3000.0, 3000.0, false,
                                [](nlohmann::json &out) { out = experiment_settings.beam_x; },
                                [](nlohmann::json &in) { experiment_settings.beam_x = in.get<double>(); },
