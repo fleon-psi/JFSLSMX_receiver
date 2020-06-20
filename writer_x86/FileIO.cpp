@@ -670,18 +670,50 @@ int write_data_files_links() {
 
 int write_spots() {
 	hid_t grp = createGroup(master_file_id, "/entry/processing","NXcollection");
-        
-        double *tmp = (double *) calloc(6*spots.size(),sizeof(double));
-        for (int i = 0; i < spots.size(); i++) {
-            tmp[i*6]   = spots[i].x;
-            tmp[i*6+1] = spots[i].y;
-            tmp[i*6+2] = spots[i].z;
-            tmp[i*6+3] = spots[i].photons;
-            tmp[i*6+4] = spots[i].pixels;
-            tmp[i*6+5] = spots[i].depth;
-        }
 
-        saveDouble2D(grp, "spots", tmp, "", spots.size(), 6);
+        double *tmp = (double *) calloc(spots.size(),sizeof(double));
+
+        for (int i = 0; i < spots.size(); i++)
+            tmp[i]   = spots[i].z;
+        saveDouble1D(grp, "spot_frame_number", tmp, "", spots.size());
+
+        for (int i = 0; i < spots.size(); i++)
+            tmp[i]   = spots[i].photons;
+        saveDouble1D(grp, "spot_photons", tmp, "", spots.size());
+
+        for (int i = 0; i < spots.size(); i++)
+            tmp[i]   = spots[i].d;
+        saveDouble1D(grp, "spot_d", tmp, "", spots.size());
+
+        for (int i = 0; i < spots.size(); i++)
+            tmp[i]   = spots[i].pixels;
+        saveDouble1D(grp, "spot_pixels", tmp, "", spots.size());
+
+        for (int i = 0; i < spots.size(); i++)
+            tmp[i]   = spots[i].depth;
+        saveDouble1D(grp, "spot_depth", tmp, "", spots.size());
+
+        for (int i = 0; i < spots.size(); i++)
+            tmp[i]   = spots[i].q[0];
+        saveDouble1D(grp, "spot_p", tmp, "", spots.size());
+
+        tmp = (double *) recalloc(tmp, 2 * spots.size()*sizeof(double));
+
+        for (int i = 0; i < spots.size(); i++) {
+            tmp[2*i]     = spots[i].x;
+            tmp[2*i+1]   = spots[i].y;
+        }
+        saveDouble2D(grp, "spot_coord", tmp, "", spots.size(), 2);
+
+        tmp = (double *) recalloc(tmp, 3 * spots.size()*sizeof(double));
+
+        for (int i = 0; i < spots.size(); i++) {
+            tmp[3*i]     = spots[i].q[0];
+            tmp[3*i+1]   = spots[i].q[1];
+            tmp[3*i+2]   = spots[i].q[2];
+        }
+        saveDouble2D(grp, "spot_recip_coord", tmp, "", spots.size(), 3);
+
         free(tmp);
 	H5Gclose(grp);
         return 0;
