@@ -34,6 +34,19 @@
 #define RDMA_SQ_PSN 532
 #define RDMA_SQ_SIZE (NCUDA_STREAMS*CUDA_TO_IB_BUFFER*NIMAGES_PER_STREAM) // 3840, size of send queue, must be multiplier of frames per CUDA stream
 
+// Maximum number of strong pixel in 2 veritcal modules
+// if there are more pixels, these will be overwritten
+// in ring buffer fashion
+#define MAX_STRONG 16384L
+
+// Size of bounding box for pixel
+#define NBX 3
+#define NBY 3
+
+// TODO - this should be in common header
+#define COLS (2*1030L)
+#define LINES (514L)
+
 extern experiment_settings_t experiment_settings;
 
 // Settings only necessary for receiver
@@ -120,5 +133,7 @@ extern int cuda_stream_ready[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 extern pthread_mutex_t writer_threads_done_mutex[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 extern pthread_cond_t writer_threads_done_cond[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 extern int writer_threads_done[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
+
+void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool connect_frames, size_t images, size_t image0);
 
 #endif
