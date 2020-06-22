@@ -52,7 +52,7 @@ int trigger_rpi() {
 }
 
 
-int trigger_omega() {
+/* int trigger_omega() {
 	ssh_session my_ssh_session;	
 	my_ssh_session = ssh_new();
         if (my_ssh_session == NULL) {
@@ -119,7 +119,7 @@ int trigger_omega() {
         ssh_free(my_ssh_session);
         std::cout << "SSH OK" << std::endl;
         return 0;
-}
+} */
 
 
 int setup_detector() {
