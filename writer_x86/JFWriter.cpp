@@ -36,6 +36,8 @@ size_t bad_pixels[NMODULES*NCARDS];
 int jfwriter_setup() {
     // Register HDF5 bitshuffle filter
     H5Zregister(bshuf_H5Filter);
+
+    // Setup
 #ifndef OFFLINE
     try {
         det = new sls::Detector();
@@ -48,6 +50,9 @@ int jfwriter_setup() {
         if (setup_infiniband(i)) return 1;
         pthread_mutex_init(&(remaining_images_mutex[i]), NULL);
     }
+
+    init_influxdb_client();
+
     return 0;
 }
 
@@ -57,6 +62,8 @@ int jfwriter_close() {
         close_infiniband(i);
         pthread_mutex_destroy(&(remaining_images_mutex[i]));
     }
+    close_influxdb_client();
+
 #ifndef OFFLINE
     delete(det);
 #endif
@@ -75,6 +82,10 @@ int jfwriter_start() {
 
     if (experiment_settings.conversion_mode == MODE_QUIT)
         return 0;
+
+    // Reset compressed dataset size
+    total_compressed_size = 0;
+
 #ifndef OFFLINE
     if (setup_detector() == 1) return 1;
 #endif
@@ -185,13 +196,13 @@ int jfwriter_pedestalG0() {
     writer_settings.timing_trigger = false;
 
     if (jfwriter_start() == 1) return 1;
-    if (jfwriter_disarm() == 1) return 1;
+    if (jfwriter_stop() == 1) return 1;
     time_pedestalG0 = time_start;
 
     experiment_settings = tmp_settings;
     calc_mean_pedestal(gain_pedestal.pedeG0, mean_pedestalG0);
     count_bad_pixel();
-
+    log_pedestal_G0();
     return 0;
 }
 
@@ -204,12 +215,13 @@ int jfwriter_pedestalG1() {
     writer_settings.timing_trigger = false;
 
     if (jfwriter_start() == 1) return 1;
-    if (jfwriter_disarm() == 1) return 1;
+    if (jfwriter_stop() == 1) return 1;
     time_pedestalG1 = time_start;
 
     experiment_settings = tmp_settings;
     calc_mean_pedestal(gain_pedestal.pedeG1, mean_pedestalG1);
     count_bad_pixel();
+    log_pedestal_G1();
     return 0;
 }
 
@@ -222,13 +234,14 @@ int jfwriter_pedestalG2() {
     writer_settings.timing_trigger = false;
 
     if (jfwriter_start() == 1) return 1;
-    if (jfwriter_disarm() == 1) return 1;
+    if (jfwriter_stop() == 1) return 1;
 
     time_pedestalG2 = time_start;
 
     experiment_settings = tmp_settings;
     calc_mean_pedestal(gain_pedestal.pedeG2, mean_pedestalG2);
     count_bad_pixel();
+    log_pedestal_G2();
     return 0;
 }
 
@@ -236,11 +249,11 @@ int jfwriter_pedestalG2() {
 int jfwriter_arm() {
     time_t now;
     time(&now);
-    if (((long)(time - time_pedestalG0.tv_sec) > PEDESTAL_TIME_CUTOFF)
+    if (((long)(now - time_pedestalG0.tv_sec) > PEDESTAL_TIME_CUTOFF)
         && (experiment_settings.pedestalG0_frames == 0))
         if (jfwriter_pedestalG0()) return 1;
-    if (((long)(time - time_pedestalG1.tv_sec) > PEDESTAL_TIME_CUTOFF)
-        || ((long)(time - time_pedestalG2.tv_sec) > PEDESTAL_TIME_CUTOFF)) {
+    if (((long)(now - time_pedestalG1.tv_sec) > PEDESTAL_TIME_CUTOFF)
+        || ((long)(now - time_pedestalG2.tv_sec) > PEDESTAL_TIME_CUTOFF)) {
         if (jfwriter_pedestalG1()) return 1;
         if (jfwriter_pedestalG2()) return 1;
     }
@@ -260,6 +273,14 @@ int jfwriter_arm() {
 }
 
 int jfwriter_disarm() {
-    int retval = jfwriter_stop();
-    return retval;
+    int err = jfwriter_stop();
+    if (!err) {
+        if (experiment_settings.pedestalG0_frames > 0) {
+            calc_mean_pedestal(gain_pedestal.pedeG0, mean_pedestalG0);
+            count_bad_pixel();
+            log_pedestal_G0();
+        }
+        log_measurement();
+    }
+    return err;
 }

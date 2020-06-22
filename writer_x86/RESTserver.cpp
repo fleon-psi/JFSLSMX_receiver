@@ -122,6 +122,7 @@ void default_parameters() {
     writer_settings.timing_trigger = true;
     writer_settings.hdf18_compat = false;
     writer_settings.default_path = "/mnt/ssd/";
+    writer_settings.influxdb_url="http://mx-jungfrau-1:8086";
 
     //These parameters are not changeable at the moment
     writer_connection_settings[0].ib_dev_name = "mlx5_1";

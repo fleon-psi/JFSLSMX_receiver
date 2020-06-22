@@ -56,7 +56,8 @@ struct writer_settings_t {
     write_mode_t write_mode;    // Writing mode
     bool timing_trigger;        // Timing mode (true = external triger, false = internal trigger)
     bool hdf18_compat;          // True = (compatibility with HDF5 1.8), False = (use SWMR and VDS)
-    std::string tracking_id;
+    std::string tracking_id;    // Dataset tracking ID, assigned by beamline
+    std::string influxdb_url;   // URL of InfluxDB database
 };
 
 extern writer_settings_t writer_settings;
@@ -185,6 +186,14 @@ int tcp_receive(int sockfd, char *buffer, size_t size);
 int connect_to_power9(int card_id);
 int disconnect_from_power9(int card_id);
 int exchange_magic_number(int sockfd);
+
+void log_error(std::string category, std::string msg);
+void log_measurement();
+void log_pedestal_G0();
+void log_pedestal_G1();
+void log_pedestal_G2();
+void init_influxdb_client();
+void close_influxdb_client();
 
 void mean_pedeG0(double out[NMODULES*NCARDS]);
 void mean_pedeG1(double out[NMODULES*NCARDS]);
