@@ -7,3 +7,6 @@
 [submodule "zstd"]
 	path = zstd
 	url = https://github.com/facebook/zstd
+[submodule "slsDetectorPackage"]
+	path = slsDetectorPackage
+	url = https://github.com/slsdetectorgroup/slsDetectorPackage
