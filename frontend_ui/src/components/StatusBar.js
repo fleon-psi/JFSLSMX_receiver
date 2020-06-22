@@ -10,7 +10,7 @@ import Button from '@material-ui/core/Button';
 class StatusBar extends Component {
 
   reinitialize() {
-     fetch('http://' + window.location.hostname + ':5232/detector/api/jf-0.1.0/command/initialize',{method : "PUT"});
+     fetch('http://' + window.location.hostname + '/jf/command/initialize',{method : "PUT"});
   }
 
   render() {

@@ -24,7 +24,8 @@ class App extends Component {
   }
 
   updateREST() {
-    fetch('http://' + window.location.hostname + ':5232/config', {crossDomain:true})
+    //fetch('http://' + window.location.hostname + '/jf/config', {crossDomain:true})
+      fetch('http://' + window.location.hostname + '/jf/config', {crossDomain:true})
     .then(handleErrors)
     .then(res => res.json())
     .then(data => {

@@ -16,11 +16,11 @@ class SpotFindingPlot extends Component {
   }
 
   updateImg() {
-    fetch('http://' + window.location.hostname + ':5232/spot_sequence', {crossDomain:true})
+    fetch('http://' + window.location.hostname + '/jf/spot_sequence', {crossDomain:true})
     .then(res => res.json())
     .then(data => { if (this.state.sequence !== data.sequence) {
         this.setState({sequence: data.sequence});
-        fetch('http://' + window.location.hostname + ':5232/spot_count', {crossDomain:true})
+        fetch('http://' + window.location.hostname + '/jf/spot_count', {crossDomain:true})
         .then(res => res.json())
         .then( data1 => this.setState({ spots: data1}) );
         }

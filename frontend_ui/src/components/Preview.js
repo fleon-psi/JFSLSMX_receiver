@@ -42,8 +42,8 @@ class Preview extends Component {
             <div style={{  width: '1030px', height: '1028px' }}>
               <PinchZoomPan maxScale={4.0}>
                 {this.state.logarithmic?
-                   <img src={"http://mx-jungfrau-1:5232/preview_log/" + this.state.contrast + "/" + this.state.image} alt="Preview"/>:
-                   <img src={"http://mx-jungfrau-1:5232/preview/" + this.state.contrast + "/" + this.state.image} alt="Preview"/>}
+                   <img src={"http://"+ window.location.hostname + "/jf/preview_log/" + this.state.contrast + "/" + this.state.image} alt="Preview"/>:
+                   <img src={"http://"+ window.location.hostname + "/jf/preview/" + this.state.contrast + "/" + this.state.image} alt="Preview"/>}
               </PinchZoomPan>
             </div>
           </Grid>
