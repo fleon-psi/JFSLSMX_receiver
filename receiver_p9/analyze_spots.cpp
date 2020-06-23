@@ -28,8 +28,8 @@ void merge_spots(spot_t &spot1, const spot_t spot2) {
         spot1.x = spot1.x + spot2.x;
         spot1.y = spot1.y + spot2.y;
         spot1.z = spot1.z + spot2.z;
+
         spot1.photons = spot1.photons + spot2.photons;
-        spot1.pixels = spot1.pixels + spot2.pixels;
 
         if (spot2.max_line > spot1.max_line) spot1.max_line = spot2.max_line;
         if (spot2.max_col > spot1.max_col) spot1.max_col = spot2.max_col;
@@ -66,7 +66,7 @@ spot_t add_pixel(strong_pixel_maps_t &strong_pixel_maps, size_t i, strong_pixel_
     // Y has to be corrected for vertical position of the fragment
     ret_value.z = (i / 2) * photons;
     ret_value.photons = photons;
-    ret_value.pixels = 1;
+
     ret_value.first_frame = i/2;
     ret_value.last_frame = i/2;
     ret_value.max_col = col;
