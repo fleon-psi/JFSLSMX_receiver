@@ -26,13 +26,6 @@
 #include "JFWriter.h"
 
 #define API_VERSION "jf-0.1.0"
-#define KEV_OVER_ANGSTROM 12.398
-
-#define FRAME_TIME_FULL_SPEED 0.0005
-#define COUNT_TIME_FULL_SPEED 0.00047
-
-#define FRAME_TIME_HALF_SPEED 0.001
-#define COUNT_TIME_HALF_SPEED 0.00001
 
 #define PISTACHE_THREADS 4
 #define PISTACHE_PORT 5232
@@ -59,85 +52,6 @@ std::string state_to_string() {
     }
 }
 
-// Recalculates data collection parameters (summation, number of images, number of frames)
-// TODO: Should check count_time_detector is reasonable
-void update_summation() {
-    if (experiment_settings.jf_full_speed) {
-        if (experiment_settings.frame_time_detector < FRAME_TIME_FULL_SPEED)
-            experiment_settings.frame_time_detector = FRAME_TIME_FULL_SPEED;
-//        if (experiment_settings.count_time_detector < COUNT_TIME_FULL_SPEED) experiment_settings.count_time_detector = COUNT_TIME_FULL_SPEED;
-    } else {
-        if (experiment_settings.frame_time_detector < FRAME_TIME_HALF_SPEED)
-            experiment_settings.frame_time_detector = FRAME_TIME_HALF_SPEED;
-//        if (experiment_settings.count_time_detector < COUNT_TIME_HALF_SPEED) experiment_settings.count_time_detector = COUNT_TIME_HALF_SPEED;
-    }
-
-    experiment_settings.summation = std::lround(
-            experiment_settings.frame_time / experiment_settings.frame_time_detector);
-
-    // Summation
-    if (experiment_settings.summation == 0) experiment_settings.summation = 1;
-
-    experiment_settings.frame_time = experiment_settings.frame_time_detector * experiment_settings.summation;
-    experiment_settings.count_time = experiment_settings.count_time_detector * experiment_settings.summation;
-
-    if (experiment_settings.summation == 1) experiment_settings.pixel_depth = 2;
-    else experiment_settings.pixel_depth = 4;
-
-    if (experiment_settings.ntrigger == 0)
-        experiment_settings.nimages_to_write = experiment_settings.nimages_to_write_per_trigger;
-    else
-        experiment_settings.nimages_to_write =
-                experiment_settings.nimages_to_write_per_trigger * experiment_settings.ntrigger;
-
-    experiment_settings.nframes_to_collect = experiment_settings.pedestalG0_frames
-                                             + experiment_settings.summation * experiment_settings.nimages_to_write
-                                             + experiment_settings.beamline_delay /
-                                               experiment_settings.frame_time_detector
-                                             + experiment_settings.shutter_delay * experiment_settings.ntrigger /
-                                               experiment_settings.frame_time_detector;
-}
-
-// Set initial parameters
-void default_parameters() {
-    experiment_settings.jf_full_speed = false;
-    experiment_settings.frame_time_detector = FRAME_TIME_HALF_SPEED;
-    experiment_settings.count_time_detector = COUNT_TIME_HALF_SPEED;
-    experiment_settings.summation = 1;
-    experiment_settings.frame_time = FRAME_TIME_HALF_SPEED;
-    experiment_settings.nimages_to_write = 0;
-    experiment_settings.ntrigger = 0;
-    experiment_settings.energy_in_keV = 12.4;
-    experiment_settings.pedestalG0_frames = 2000;
-    experiment_settings.pedestalG1_frames = 1000;
-    experiment_settings.pedestalG2_frames = 1000;
-    experiment_settings.conversion_mode = MODE_CONV;
-    experiment_settings.enable_spot_finding = true;
-    experiment_settings.connect_spots_between_frames = true;
-    experiment_settings.strong_pixel = 3.0;
-
-    writer_settings.write_mode = JF_WRITE_HDF5;
-    writer_settings.images_per_file = 1000;
-    writer_settings.nthreads = NCARDS * 8; // Spawn 8 writer threads per card
-    writer_settings.timing_trigger = true;
-    writer_settings.hdf18_compat = false;
-    writer_settings.default_path = "/mnt/ssd/";
-    writer_settings.influxdb_url="http://mx-jungfrau-1:8086";
-
-    //These parameters are not changeable at the moment
-    writer_connection_settings[0].ib_dev_name = "mlx5_1";
-    writer_connection_settings[0].receiver_host = "mx-ic922-1";
-    writer_connection_settings[0].receiver_tcp_port = 52320;
-
-    if (NCARDS == 2) {
-        writer_connection_settings[1].ib_dev_name = "mlx5_12";
-        writer_connection_settings[1].receiver_host = "mx-ic922-1";
-        writer_connection_settings[1].receiver_tcp_port = 52321;
-    }
-
-    update_summation();
-}
-
 // Actions to execute by the detector
 // TODO: Wrong parameters should raise errors
 // TODO: Offer fast measurement mode for test shots - no pedestal G0, just external trigger
@@ -156,7 +70,7 @@ void detector_command(const Pistache::Rest::Request &request, Pistache::Http::Re
         if (daq_state == STATE_ACQUIRE)
             jfwriter_disarm();
         daq_state = STATE_CHANGE;
-        default_parameters();
+        set_default_parameters();
         if (jfwriter_pedestalG0()) daq_state = STATE_ERROR;
         else if (jfwriter_pedestalG1()) daq_state = STATE_ERROR;
         else if (jfwriter_pedestalG2()) daq_state = STATE_ERROR;
@@ -316,7 +230,6 @@ void detector_set(const Pistache::Rest::Request &request, Pistache::Http::Respon
         pthread_mutex_unlock(&daq_state_mutex);
         response.send(Pistache::Http::Code::Not_Found, "Error in json parser");
     }
-    update_summation();
     pthread_mutex_unlock(&daq_state_mutex);
     response.send(Pistache::Http::Code::Ok);
 }
@@ -387,7 +300,6 @@ void detector_set_multiple(const Pistache::Rest::Request &request, Pistache::Htt
         pthread_mutex_unlock(&daq_state_mutex);
         response.send(Pistache::Http::Code::Not_Found, "Error in json parser");
     }
-    update_summation();
     pthread_mutex_unlock(&daq_state_mutex);
     response.send(Pistache::Http::Code::Ok);
 }
@@ -453,7 +365,7 @@ void allow(const Pistache::Rest::Request &request, Pistache::Http::ResponseWrite
 int main() {
     daq_state = STATE_NOT_INITIALIZED;
 
-    default_parameters();
+    set_default_parameters();
 
     jfwriter_setup();
 

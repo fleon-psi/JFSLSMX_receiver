@@ -16,10 +16,16 @@
 
 #include "JFWriter.h"
 
+#define READOUT_TIME_IN_US 30
+
+#define MIN_COUNT_TIME_IN_US 10
+#define MAX_FRAME_TIME_FULL_SPEED_IN_US 450
+#define MAX_FRAME_TIME_HALF_SPEED_IN_US 900
+
 std::map<std::string, parameter_t> detector_options = {
         {"frame_time", {"s", PARAMETER_FLOAT, 0.0005, 2.0, false,
                                [](nlohmann::json &out) { out = experiment_settings.frame_time; },
-                               [](nlohmann::json &in) { experiment_settings.frame_time = in.get<double>();},
+                               [](nlohmann::json &in) { experiment_settings.frame_time = in.get<double>(); update_summation(); },
                                "Time till start of next image"
                        }},
         {"count_time", {"s", PARAMETER_FLOAT, 0.0005, 1.0,true,
@@ -27,39 +33,71 @@ std::map<std::string, parameter_t> detector_options = {
                                [](nlohmann::json &in) { throw read_only_exception(); },
                                "Counting time for one image"
                        }},
-        {"frame_time_detector", {"us", PARAMETER_FLOAT, 450, 10000, false,
+        {"frame_time_detector", {"us", PARAMETER_FLOAT, MAX_FRAME_TIME_FULL_SPEED_IN_US, 10000, false,
                                [](nlohmann::json &out) { out = experiment_settings.frame_time_detector * 1000000.0; },
-                               [](nlohmann::json &in) { experiment_settings.frame_time_detector = in.get<double>() / 1000000.0; },
+                               [](nlohmann::json &in) {
+                                   if (experiment_settings.frame_time_detector != in.get<double>() / 1000000.0) {
+                                       experiment_settings.frame_time_detector = in.get<double>() / 1000000.0;
+                                       time_pedestalG0.tv_sec = 0; // Frame time affects only G0 pedestal, which is marked as invalidated
+                                       if (experiment_settings.frame_time_detector < experiment_settings.count_time_detector + READOUT_TIME_IN_US / 1e6) {
+                                           experiment_settings.count_time_detector = experiment_settings.frame_time_detector - READOUT_TIME_IN_US / 1e6;
+                                       }
+                                       update_summation();
+                                   }},
                                "Internal frame time of the detector"
                        }},
-        {"count_time_detector", {"us", PARAMETER_FLOAT, 10, 0.001, false,
+        {"count_time_detector", {"us", PARAMETER_FLOAT, MIN_COUNT_TIME_IN_US, 0.001, false,
                                [](nlohmann::json &out) { out = experiment_settings.count_time_detector * 1000000.0; },
-                               [](nlohmann::json &in) { experiment_settings.count_time_detector = in.get<double>() / 1000000.0; },
+                               [](nlohmann::json &in) {
+                                   if (experiment_settings.count_time_detector != in.get<double>() / 1000000.0) {
+                                       experiment_settings.count_time_detector = in.get<double>() / 1000000.0;
+                                       time_pedestalG0.tv_sec = 0; // count time affects all pedestal, which is marked as invalidated
+                                       time_pedestalG1.tv_sec = 0; // count time affects all pedestal, which is marked as invalidated
+                                       time_pedestalG2.tv_sec = 0; // count time affects all pedestal, which is marked as invalidated
+                                       if (experiment_settings.frame_time_detector < experiment_settings.count_time_detector + READOUT_TIME_IN_US / 1e6) {
+                                           experiment_settings.frame_time_detector = experiment_settings.count_time_detector + READOUT_TIME_IN_US / 1e6;
+                                       }
+                                       update_summation();
+                                   }
+                               },
                                "Internal count time of the detector"
                        }},
         {"shutter_delay", {"ms", PARAMETER_FLOAT, 0.0, 1000.0, false,
                                [](nlohmann::json &out) { out = experiment_settings.shutter_delay * 1000.0; },
-                               [](nlohmann::json &in) { experiment_settings.shutter_delay = in.get<double>() / 1000.0; },
+                               [](nlohmann::json &in) { experiment_settings.shutter_delay = in.get<double>() / 1000.0; update_summation(); },
                                "Time to open/close shutter"
                        }},
         {"beamline_delay", {"s", PARAMETER_FLOAT, 0.0, 100.0, false,
                                [](nlohmann::json &out) { out = experiment_settings.beamline_delay; },
-                               [](nlohmann::json &in) { experiment_settings.beamline_delay = in.get<double>(); },
+                               [](nlohmann::json &in) { experiment_settings.beamline_delay = in.get<double>(); update_summation(); },
                                "Maximal time taken by the beamline to prepare data collection, from the moment \"arm\" command is released"
                        }},
         {"pedestalG0_frames",{"", PARAMETER_UINT, 0, 10000, false,
                                [](nlohmann::json &out) { out = experiment_settings.pedestalG0_frames; },
-                               [](nlohmann::json &in) { experiment_settings.pedestalG0_frames = in.get<uint32_t>(); },
+                               [](nlohmann::json &in) {
+                                   if (experiment_settings.pedestalG0_frames != in.get<uint32_t>()) {
+                                       experiment_settings.pedestalG0_frames = in.get<uint32_t>();
+                                       time_pedestalG0.tv_sec = 0;
+                                       update_summation();
+                                   }},
                                "Number of frames to collect for G0 pedestal"
                        }},
         {"pedestalG1_frames",{"", PARAMETER_UINT, 0, 10000, false,
                                [](nlohmann::json &out) { out = experiment_settings.pedestalG1_frames; },
-                               [](nlohmann::json &in) { experiment_settings.pedestalG1_frames = in.get<uint32_t>(); },
+                               [](nlohmann::json &in) {
+                                   if (experiment_settings.pedestalG1_frames != in.get<uint32_t>()) {
+                                       experiment_settings.pedestalG1_frames = in.get<uint32_t>();
+                                       time_pedestalG1.tv_sec = 0;
+                                   }},
                                "Number of frames to collect for G1 pedestal"
                        }},
         {"pedestalG2_frames",{"", PARAMETER_UINT, 0, 10000, false,
                                [](nlohmann::json &out) { out = experiment_settings.pedestalG2_frames; },
-                               [](nlohmann::json &in) { experiment_settings.pedestalG2_frames = in.get<uint32_t>(); },
+                               [](nlohmann::json &in) {
+                                   if (experiment_settings.pedestalG2_frames != in.get<uint32_t>()) {
+                                       experiment_settings.pedestalG2_frames = in.get<uint32_t>();
+                                       time_pedestalG2.tv_sec = 0;
+                                   }},
                                "Number of frames to collect for G1 pedestal"
                        }},
         {"summation",{"", PARAMETER_UINT, 1, 5000, true,
@@ -74,7 +112,7 @@ std::map<std::string, parameter_t> detector_options = {
                        }},
         {"ntrigger",{"", PARAMETER_UINT, 1, 30000, false,
                                [](nlohmann::json &out) { out = experiment_settings.ntrigger; },
-                               [](nlohmann::json &in) { experiment_settings.ntrigger = in.get<uint32_t>(); },
+                               [](nlohmann::json &in) { experiment_settings.ntrigger = in.get<uint32_t>(); update_summation(); },
                                "Number of expected triggers"
                        }},
         {"frames_to_collect",{"", PARAMETER_UINT, 1, 30000, true,
@@ -89,7 +127,7 @@ std::map<std::string, parameter_t> detector_options = {
                        }},
         {"nimages",{"", PARAMETER_UINT, 1, 1000000, false,
                                [](nlohmann::json &out) { out = experiment_settings.nimages_to_write_per_trigger; },
-                               [](nlohmann::json &in) { experiment_settings.nimages_to_write_per_trigger = in.get<uint32_t>(); },
+                               [](nlohmann::json &in) { experiment_settings.nimages_to_write_per_trigger = in.get<uint32_t>(); update_summation(); },
                                "Number of images per trigger"
                        }},
         {"photon_energy",{"keV", PARAMETER_FLOAT, 3.0, 30.0, false,
@@ -98,10 +136,10 @@ std::map<std::string, parameter_t> detector_options = {
                                "Expected energy of incoming photons"
                        }},
         {"wavelength",{"A", PARAMETER_FLOAT, WVL_1A_IN_KEV / 30.0, WVL_1A_IN_KEV / 3.0, false,
-                                 [](nlohmann::json &out) { out = WVL_1A_IN_KEV / experiment_settings.energy_in_keV; },
-                                 [](nlohmann::json &in) { experiment_settings.energy_in_keV = WVL_1A_IN_KEV / in.get<double>(); },
-                                 "Expected energy of incoming photons"
-                         }},
+                               [](nlohmann::json &out) { out = WVL_1A_IN_KEV / experiment_settings.energy_in_keV; },
+                               [](nlohmann::json &in) { experiment_settings.energy_in_keV = WVL_1A_IN_KEV / in.get<double>(); },
+                                                            "Expected energy of incoming photons"
+                       }},
         {"beam_center_x",{"pxl", PARAMETER_FLOAT, -3000.0, 3000.0, false,
                                [](nlohmann::json &out) { out = experiment_settings.beam_x; },
                                [](nlohmann::json &in) { experiment_settings.beam_x = in.get<double>(); },
@@ -118,15 +156,20 @@ std::map<std::string, parameter_t> detector_options = {
                                "Y beam center positions (in expanded detector coordinates)"
                        }},
         {"total_flux",{"e/s", PARAMETER_FLOAT, 0.0, INFINITY, false,
-                                     [](nlohmann::json &out) { out = experiment_settings.total_flux; },
-                                     [](nlohmann::json &in) { experiment_settings.total_flux = in.get<double>(); },
-                                     "Total photon flux on the sample"
-                             }},
+                               [](nlohmann::json &out) { out = experiment_settings.total_flux; },
+                               [](nlohmann::json &in) { experiment_settings.total_flux = in.get<double>(); },
+                               "Total photon flux on the sample"
+                       }},
+        {"transmission",{"", PARAMETER_FLOAT, 0.0, 1.0, false,
+                               [](nlohmann::json &out) { out = experiment_settings.transmission; },
+                               [](nlohmann::json &in) { experiment_settings.transmission = in.get<double>(); },
+                               "Total photon flux on the sample"
+                       }},
         {"beam_size_x",{"um", PARAMETER_FLOAT, 0.0, 5000.0, false,
-                              [](nlohmann::json &out) { out = experiment_settings.beam_size_x; },
-                              [](nlohmann::json &in) { experiment_settings.beam_size_x = in.get<double>(); },
-                              "Beam size in horizontal direction"
-                      }},
+                               [](nlohmann::json &out) { out = experiment_settings.beam_size_x; },
+                               [](nlohmann::json &in) { experiment_settings.beam_size_x = in.get<double>(); },
+                               "Beam size in horizontal direction"
+                       }},
         {"beam_size_y",{"um", PARAMETER_FLOAT, 0.0, 5000.0, false,
                                [](nlohmann::json &out) { out = experiment_settings.beam_size_y; },
                                [](nlohmann::json &in) { experiment_settings.beam_size_y = in.get<double>(); },
@@ -148,15 +191,15 @@ std::map<std::string, parameter_t> detector_options = {
                                "Strong pixel parameter for spot finding"
                        }},
         {"spot_finding_max_depth",{"", PARAMETER_UINT, 1.0, NIMAGES_PER_STREAM, false,
-                                             [](nlohmann::json &out) { out = experiment_settings.max_spot_depth; },
-                                             [](nlohmann::json &in) {  experiment_settings.max_spot_depth = in.get<uint16_t>(); },
-                                             "Spots present on more images than this value are discarded"
-                                     }},
+                               [](nlohmann::json &out) { out = experiment_settings.max_spot_depth; },
+                               [](nlohmann::json &in) {  experiment_settings.max_spot_depth = in.get<uint16_t>(); },
+                               "Spots present on more images than this value are discarded"
+                       }},
         {"spot_finding_min_pixel",{"", PARAMETER_UINT, 1.0, 5000.0, false,
-                                          [](nlohmann::json &out) { out = experiment_settings.min_pixels_per_spot; },
-                                          [](nlohmann::json &in) {  experiment_settings.min_pixels_per_spot = in.get<uint16_t>(); },
-                                          "Spots with less pixels than this value are discarded"
-                                  }},
+                               [](nlohmann::json &out) { out = experiment_settings.min_pixels_per_spot; },
+                               [](nlohmann::json &in) {  experiment_settings.min_pixels_per_spot = in.get<uint16_t>(); },
+                               "Spots with less pixels than this value are discarded"
+                       }},
         {"spot_finding_dimensions", {"", PARAMETER_STRING, 0.0, 0.0, false,
                                [](nlohmann::json &out) { experiment_settings.connect_spots_between_frames? out = "3D": out="2D";},
                                [](nlohmann::json &in) { if (in.get<std::string>() == "2D") experiment_settings.connect_spots_between_frames = false;
@@ -202,15 +245,15 @@ std::map<std::string, parameter_t> detector_options = {
                                "Name pattern for output file"
                        }},
         {"omega_increment",{"deg", PARAMETER_FLOAT, 0.0, 20.0, false,
-                                [](nlohmann::json &out) { out = experiment_settings.omega_angle_per_image; },
-                                [](nlohmann::json &in) { experiment_settings.omega_angle_per_image = in.get<double>(); },
-                                "Increase of omega angle per image (0 = raster)"
-                        }},
+                               [](nlohmann::json &out) { out = experiment_settings.omega_angle_per_image; },
+                               [](nlohmann::json &in) { experiment_settings.omega_angle_per_image = in.get<double>(); },
+                               "Increase of omega angle per image (0 = raster)"
+                       }},
         {"omega_start",{"deg", PARAMETER_FLOAT, -INFINITY, INFINITY, false,
-                                   [](nlohmann::json &out) { out = experiment_settings.omega_start; },
-                                   [](nlohmann::json &in) { experiment_settings.omega_start = in.get<double>(); },
-                                   "Start omega angle"
-                           }},
+                               [](nlohmann::json &out) { out = experiment_settings.omega_start; },
+                               [](nlohmann::json &in) { experiment_settings.omega_start = in.get<double>(); },
+                               "Start omega angle"
+                       }},
         // TODO: This should be private variable - remove after development
         {"default_path",{"", PARAMETER_STRING, 0.0, 0.0, false,
                                [](nlohmann::json &out) { out = writer_settings.default_path; },
@@ -218,29 +261,98 @@ std::map<std::string, parameter_t> detector_options = {
                                "Path on the JF server to output files"
                        }},
         {"pedestalG0_mean", {"ADU", PARAMETER_FLOAT, 0.0, 0.0, true,
-                                    [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(mean_pedestalG0[i]); },
-                                    [](nlohmann::json &in) { throw read_only_exception(); },
-                                    "Mean pedestal of gain G0 (per modules)"
-                            }},
+                               [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(mean_pedestalG0[i]); },
+                               [](nlohmann::json &in) { throw read_only_exception(); },
+                               "Mean pedestal of gain G0 (per modules)"
+                       }},
         {"pedestalG1_mean", {"ADU", PARAMETER_FLOAT, 0.0, 0.0, true,
-                                    [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(mean_pedestalG1[i]); },
-                                    [](nlohmann::json &in) { throw read_only_exception(); },
-                                    "Mean pedestal of gain G1 (per module)"
-                            }},
+                               [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(mean_pedestalG1[i]); },
+                               [](nlohmann::json &in) { throw read_only_exception(); },
+                               "Mean pedestal of gain G1 (per module)"
+                       }},
         {"pedestalG2_mean", {"ADU", PARAMETER_FLOAT, 0.0, 0.0, true,
-                             [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(mean_pedestalG2[i]); },
-                             [](nlohmann::json &in) { throw read_only_exception(); },
-                             "Mean pedestal of gain G2 (per module)"
-            }},
+                               [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(mean_pedestalG2[i]); },
+                               [](nlohmann::json &in) { throw read_only_exception(); },
+                               "Mean pedestal of gain G2 (per module)"
+                       }},
         {"bad_pixels", {"", PARAMETER_FLOAT, 0.0, 0.0, true,
-                                    [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(bad_pixels[i]); },
-                                    [](nlohmann::json &in) { throw read_only_exception(); },
-                                    "Number of bad pixels (per module)"
-                            }}
+                               [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(bad_pixels[i]); },
+                               [](nlohmann::json &in) { throw read_only_exception(); },
+                               "Number of bad pixels (per module)"
+                       }}
 
 
 };
 
-void set_parameter(nlohmann::json &j) {
+// Set initial parameters
+void set_default_parameters() {
+    experiment_settings.frame_time_detector = 500 / 1e6;
+    experiment_settings.count_time_detector = 470 / 1e6;
 
+    experiment_settings.frame_time = 500 / 1e6;
+    experiment_settings.nimages_to_write = 1000;
+    experiment_settings.ntrigger = 1;
+    experiment_settings.energy_in_keV = 12.4;
+    experiment_settings.pedestalG0_frames = 2000;
+    experiment_settings.pedestalG1_frames = 1000;
+    experiment_settings.pedestalG2_frames = 1000;
+    experiment_settings.conversion_mode = MODE_CONV;
+    experiment_settings.enable_spot_finding = true;
+    experiment_settings.connect_spots_between_frames = true;
+    experiment_settings.strong_pixel = 3.0;
+
+    writer_settings.write_mode = JF_WRITE_HDF5;
+    writer_settings.images_per_file = 1000;
+    writer_settings.nthreads = NCARDS * 8; // Spawn 8 writer threads per card
+    writer_settings.timing_trigger = true;
+    writer_settings.hdf18_compat = false;
+    writer_settings.default_path = "/mnt/ssd/";
+    writer_settings.influxdb_url="http://mx-jungfrau-1:8086";
+
+    //These parameters are not changeable at the moment
+    writer_connection_settings[0].ib_dev_name = "mlx5_1";
+    writer_connection_settings[0].receiver_host = "mx-ic922-1";
+    writer_connection_settings[0].receiver_tcp_port = 52320;
+
+    if (NCARDS == 2) {
+        writer_connection_settings[1].ib_dev_name = "mlx5_12";
+        writer_connection_settings[1].receiver_host = "mx-ic922-1";
+        writer_connection_settings[1].receiver_tcp_port = 52321;
+    }
+
+    update_summation();
+}
+
+// Recalculates data collection parameters (summation, number of images, number of frames)
+void update_summation() {
+
+    if (experiment_settings.frame_time_detector < MAX_FRAME_TIME_HALF_SPEED_IN_US / 1e6)
+        experiment_settings.jf_full_speed = true;
+    else
+        experiment_settings.jf_full_speed = false;
+
+    experiment_settings.summation = std::lround(
+            experiment_settings.frame_time / experiment_settings.frame_time_detector);
+
+    // Summation
+    if (experiment_settings.summation == 0) experiment_settings.summation = 1;
+
+    experiment_settings.frame_time = experiment_settings.frame_time_detector * experiment_settings.summation;
+    experiment_settings.count_time = experiment_settings.count_time_detector * experiment_settings.summation;
+
+    if (experiment_settings.summation == 1) experiment_settings.pixel_depth = 2;
+    else experiment_settings.pixel_depth = 4;
+
+    if (experiment_settings.ntrigger == 0)
+        experiment_settings.nimages_to_write = experiment_settings.nimages_to_write_per_trigger;
+    else
+        experiment_settings.nimages_to_write =
+                experiment_settings.nimages_to_write_per_trigger * experiment_settings.ntrigger;
+
+    experiment_settings.nframes_to_collect = experiment_settings.pedestalG0_frames
+                                             + experiment_settings.summation * experiment_settings.nimages_to_write
+                                             + experiment_settings.beamline_delay /
+                                               experiment_settings.frame_time_detector
+                                             + experiment_settings.shutter_delay * experiment_settings.ntrigger /
+                                               experiment_settings.frame_time_detector;
 }

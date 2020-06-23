@@ -195,6 +195,9 @@ void log_pedestal_G2();
 void init_influxdb_client();
 void close_influxdb_client();
 
+void update_summation();
+void set_default_parameters();
+
 void mean_pedeG0(double out[NMODULES*NCARDS]);
 void mean_pedeG1(double out[NMODULES*NCARDS]);
 void mean_pedeG2(double out[NMODULES*NCARDS]);
