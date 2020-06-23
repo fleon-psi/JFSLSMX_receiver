@@ -402,7 +402,7 @@ int SaveAngleContainer(hid_t location, std::string name, double start, double in
 }
 
 
-void transform_and_write_mask(hid_t grp) {
+void transform_and_write_mask(hid_t grp, bool replace = false) {
     uint32_t *pixel_mask = (uint32_t *) calloc(XPIXEL * YPIXEL, sizeof(uint32_t));
 
     for (int module = 0; module < NMODULES*NCARDS; module ++) {
@@ -425,8 +425,14 @@ void transform_and_write_mask(hid_t grp) {
         memcpy(pixel_mask + (514 * i + 256) * 1030 * 2, pixel_mask + (514 * i + 255) * 1030 * 2, 2 * 1030 * sizeof(uint32_t));
         memcpy(pixel_mask + (514 * i + 257) * 1030 * 2, pixel_mask + (514 * i + 258) * 1030 * 2, 2 * 1030 * sizeof(uint32_t));
     }
-
-    saveUInt2D(grp, "pixel_mask", pixel_mask, "", YPIXEL, XPIXEL);
+    if (replace) {
+        hid_t dataset_id = H5Dopen(master_file_id, "/entry/instrument/detector/pixel_mask", H5P_DEFAULT);
+        herr_t status = H5Dwrite(dataset_id, H5T_NATIVE_UINT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+                          pixel_mask);
+        status = H5Dclose(dataset_id);
+    } else {
+        saveUInt2D(grp, "pixel_mask", pixel_mask, "", YPIXEL, XPIXEL);
+    }
     free(pixel_mask);
 }
 
@@ -692,14 +698,16 @@ int write_spots() {
     saveDouble1D(grp, "spot_d", tmp, "", spots.size());
 
     for (int i = 0; i < spots.size(); i++)
-        tmp[i]   = spots[i].pixels;
-    saveDouble1D(grp, "spot_pixels", tmp, "", spots.size());
-
-    for (int i = 0; i < spots.size(); i++)
-        tmp[i]   = spots[i].depth;
+        tmp[i]   = spots[i].last_frame - spots[i].first_frame + 1;
     saveDouble1D(grp, "spot_depth", tmp, "", spots.size());
 
     tmp = (double *) realloc(tmp, 2 * spots.size()*sizeof(double));
+
+    for (int i = 0; i < spots.size(); i++) {
+        tmp[2 * i] = spots[i].max_col - spots[i].min_col;
+        tmp[2 * i + 1] = spots[i].max_line - spots[i].min_line;
+    }
+    saveDouble2D(grp, "spot_size", tmp, "", spots.size(), 2);
 
     for (int i = 0; i < spots.size(); i++) {
         tmp[2*i]     = spots[i].x;
@@ -812,6 +820,7 @@ int close_master_hdf5() {
 
     if (experiment_settings.enable_spot_finding) write_spots();
 
+    transform_and_write_mask(master_file_id, true);
     H5Fclose(master_file_id);
     H5Pclose(master_file_fapl);
     return 0;
