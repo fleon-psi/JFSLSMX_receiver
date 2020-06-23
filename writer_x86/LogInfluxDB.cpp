@@ -71,6 +71,17 @@ void log_pedestal_G2() {
 }
 
 void log_measurement() {
+    int64_t packets_received = (int64_t) online_statistics[0].good_packets + (int64_t) online_statistics[1].good_packets;
+
+    // If trigger mode is on, FPGA will only count packets in images to write
+    int64_t packets_expected;
+    if (experiment_settings.ntrigger > 0)
+        packets_expected = (experiment_settings.nimages_to_write * experiment_settings.summation)
+                * NCARDS * NMODULES * 128;
+    else packets_expected = experiment_settings.nframes_to_collect * NCARDS * NMODULES * 128;
+
+    int64_t packets_lost = packets_expected - packets_received;
+
     std::string content = "frames_to_collect=" + std::to_string(experiment_settings.nframes_to_collect) +
             ",images_to_write=" + std::to_string(experiment_settings.nimages_to_write) +
             ",frame_time_detector=" + std::to_string(experiment_settings.frame_time_detector) +
@@ -79,7 +90,8 @@ void log_measurement() {
             ",compression_ratio=" + std::to_string((double) (experiment_settings.nimages_to_write * NCARDS * NPIXEL * experiment_settings.pixel_depth)/ (double) total_compressed_size) +
             ",omega_range=" + std::to_string(experiment_settings.omega_angle_per_image *  experiment_settings.nimages_to_write) +
             ",spots=" + std::to_string(spots.size()) +
-            ",duration=" + std::to_string((time_end.tv_sec - time_start.tv_sec)*1000.0 + (time_end.tv_nsec - time_start.tv_nsec)/1000.0);
+            ",duration=" + std::to_string((time_end.tv_sec - time_start.tv_sec)*1000.0 + (time_end.tv_nsec - time_start.tv_nsec)/1000.0) +
+            ",lost_packets=" + std::to_string(packets_lost);
     send_to_influxdb("jungfrau", "data_collection", content, time_start.tv_sec);
 }
 
