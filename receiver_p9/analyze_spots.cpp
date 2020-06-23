@@ -30,16 +30,14 @@ void merge_spots(spot_t &spot1, const spot_t spot2) {
         spot1.z = spot1.z + spot2.z;
         spot1.photons = spot1.photons + spot2.photons;
         spot1.pixels = spot1.pixels + spot2.pixels;
-}
 
-// If spots come from two different frames, depth needs to be incremented
-void merge_spots_new_frame(spot_t &spot1, const spot_t spot2) {
-        spot1.x = spot1.x + spot2.x;
-        spot1.y = spot1.y + spot2.y;
-        spot1.z = spot1.z + spot2.z;
-        spot1.photons = spot1.photons + spot2.photons;
-        spot1.pixels = spot1.pixels + spot2.pixels;
-        spot1.depth = spot1.depth + spot2.depth + 1;
+        if (spot2.max_line > spot1.max_line) spot1.max_line = spot2.max_line;
+        if (spot2.max_col > spot1.max_col) spot1.max_col = spot2.max_col;
+
+        if (spot2.min_line > spot1.min_line) spot1.min_line = spot2.min_line;
+        if (spot2.min_col > spot1.min_col) spot1.min_col = spot2.min_col;
+        if (spot2.first_frame < spot1.first_frame) spot1.first_frame = spot2.first_frame;
+        if (spot2.last_frame > spot1.last_frame) spot1.last_frame = spot2.last_frame;
 }
 
 typedef std::pair<int16_t, int16_t> coordxy_t; // This is simply (x, y)
@@ -49,9 +47,11 @@ typedef std::map<coordxy_t, float> strong_pixel_map_t;
 typedef std::vector<strong_pixel_map_t> strong_pixel_maps_t;
 // There is one map per 1/2 frame
 
-// Creates a continous spot
+// Creates a continuous spot
 // strong pixels are loaded into dictionary (one dictionary per frame)
 // and routine checks if neighboring pixels are also in dictionary (likely in log(N) time)
+// i is number of fragment (2 modules in horizontal direction)
+// so assuming this is 2Mpixel, i/2 is frame number and i%2 defines position in vertical direction
 spot_t add_pixel(strong_pixel_maps_t &strong_pixel_maps, size_t i, strong_pixel_map_t::iterator &it, bool connect_frames) {
     spot_t ret_value;
 
@@ -63,11 +63,16 @@ spot_t add_pixel(strong_pixel_maps_t &strong_pixel_maps, size_t i, strong_pixel_
 
     ret_value.x = col * photons; // position is weighted by number of photon counts
     ret_value.y = (line + (i%2) * LINES) * photons;
-    // Y accounts for the actual module
+    // Y has to be corrected for vertical position of the fragment
     ret_value.z = (i / 2) * photons;
     ret_value.photons = photons;
     ret_value.pixels = 1;
-    ret_value.depth = 0;
+    ret_value.first_frame = i/2;
+    ret_value.last_frame = i/2;
+    ret_value.max_col = col;
+    ret_value.min_col = col;
+    ret_value.max_line = line;
+    ret_value.min_line = line;
 
     strong_pixel_map_t::iterator it2;
 
@@ -97,7 +102,7 @@ spot_t add_pixel(strong_pixel_maps_t &strong_pixel_maps, size_t i, strong_pixel_
 
     if (connect_frames && (i + 2 < strong_pixel_maps.size())) {
         if ((it2 = strong_pixel_maps[i+2].find(coordxy_t(col  , line))) != strong_pixel_maps[i+2].end())
-            merge_spots_new_frame(ret_value, add_pixel(strong_pixel_maps, i+2, it2, connect_frames));
+            merge_spots(ret_value, add_pixel(strong_pixel_maps, i+2, it2, connect_frames));
     }
     return ret_value;
 }
@@ -154,10 +159,10 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
               reciprocal_rotate(spot.q, p, omega_increment_in_radian * spot.z);
           } else
               lab_to_reciprocal(spot.q, lab, one_over_wavelength);
-          // Check for conditions - generally spots covering too many frames or to few pixels are suspicious
-          if ((spot.pixels > experiment_settings.min_pixels_per_spot)
-              && (spot.depth < experiment_settings.max_spot_depth))
-                  spots.push_back(spot);
+
+          // Spots are not verified at this point - it is "problem" of downstream analysis to select real spots vs. bad pixels and other problems
+          spots.push_back(spot);
+
           iterator = strong_pixel_maps[i].begin(); // Get first yet unprocessed spot in this frame
       }
     }
