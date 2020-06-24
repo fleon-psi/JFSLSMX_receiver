@@ -293,8 +293,8 @@ std::map<std::string, parameter_t> detector_options = {
                        }},
         {"resolution_limit_edge", {"", PARAMETER_FLOAT, 0.0, 0.0, true,
                                [](nlohmann::json &out) { 
-                                   out = {std::max(std::max(get_resolution_left(), get_resolution_right()), 
-                                                   std::max(get_resolution_top(), get_resolution_bottom()))};
+                                   out = std::max(std::max(get_resolution_left(), get_resolution_right()), 
+                                                  std::max(get_resolution_top(), get_resolution_bottom()));
                                },
                                [](nlohmann::json &in) { throw read_only_exception(); },
                                "Resolution limit on 4 edges of the detector"
