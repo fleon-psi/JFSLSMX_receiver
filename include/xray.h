@@ -58,12 +58,44 @@ inline float get_resolution(float lab[3]) {
     float wavelength =  WVL_1A_IN_KEV / (experiment_settings.energy_in_keV);
     float beam_path = sqrt(lab[0]*lab[0] + lab[1]*lab[1] + lab[2]*lab[2]);
     // Assumes planar detector, 90 deg towards beam
-    float cos_2theta = beam_path / lab[2];
+    float cos_2theta = lab[2] / beam_path;
     // cos(2theta) = cos(theta)^2 - sin(theta)^2
     // cos(2theta) = 1 - 2*sin(theta)^2
     // Technically two solutions for two theta, but it makes sense only to take positive one in this case
     float sin_theta = sqrt((1-cos_2theta)/2);
     return wavelength / (2*sin_theta);
+}
+
+inline float get_resolution_top() {
+    float lab[3];
+    lab[0] = 0.0f;
+    lab[1] = -experiment_settings.beam_y * PIXEL_SIZE_IN_MM;
+    lab[2] = experiment_settings.detector_distance;
+    return get_resolution(lab);
+}
+
+inline float get_resolution_bottom() {
+    float lab[3];
+    lab[0] = 0.0f;
+    lab[1] = ((NMODULES*NCARDS/2) * 514 + (NMODULES*NCARDS/2-1) * HORIZONTAL_GAP_PIXELS - experiment_settings.beam_y) * PIXEL_SIZE_IN_MM;
+    lab[2] = experiment_settings.detector_distance;
+    return get_resolution(lab);
+}
+
+inline float get_resolution_left() {
+    float lab[3];
+    lab[0] = -experiment_settings.beam_x * PIXEL_SIZE_IN_MM;
+    lab[1] = 0.0f;   
+    lab[2] = experiment_settings.detector_distance;
+    return get_resolution(lab);
+}
+
+inline float get_resolution_right() {
+    float lab[3];
+    lab[0] = (2 * 1030 + VERTICAL_GAP_PIXELS - experiment_settings.beam_x) * PIXEL_SIZE_IN_MM;
+    lab[1] = 0.0f;   
+    lab[2] = experiment_settings.detector_distance;
+    return get_resolution(lab);
 }
 
 #endif

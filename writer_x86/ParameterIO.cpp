@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
+#include <algorithm>
+
 #include "JFWriter.h"
+
+#include "../include/xray.h"
 
 #define READOUT_TIME_IN_US 30
 
@@ -279,6 +283,21 @@ std::map<std::string, parameter_t> detector_options = {
                                [](nlohmann::json &out) { for (int i = 0; i < NMODULES*NCARDS;i++) out.push_back(bad_pixels[i]); },
                                [](nlohmann::json &in) { throw read_only_exception(); },
                                "Number of bad pixels (per module)"
+                       }},
+        {"resolution_limit_edges", {"", PARAMETER_FLOAT, 0.0, 0.0, true,
+                               [](nlohmann::json &out) { 
+                                   out = {get_resolution_left(), get_resolution_right(), get_resolution_top(), get_resolution_bottom()};
+                               },
+                               [](nlohmann::json &in) { throw read_only_exception(); },
+                               "Resolution limit on 4 edges of the detector"
+                       }},
+        {"resolution_limit_edge", {"", PARAMETER_FLOAT, 0.0, 0.0, true,
+                               [](nlohmann::json &out) { 
+                                   out = {std::max(std::max(get_resolution_left(), get_resolution_right()), 
+                                                   std::max(get_resolution_top(), get_resolution_bottom()))};
+                               },
+                               [](nlohmann::json &in) { throw read_only_exception(); },
+                               "Resolution limit on 4 edges of the detector"
                        }}
 
 
