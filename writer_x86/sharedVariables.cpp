@@ -56,6 +56,6 @@ std::vector<spot_t> spots;
 pthread_mutex_t spots_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 std::vector<double> spot_count_per_image;
-std::vector<double> spot_intensity_per_resolution;
+spot_statistics_t spot_statistics;
 int spot_statistics_sequence = 0;
 pthread_mutex_t spots_statistics_mutex;

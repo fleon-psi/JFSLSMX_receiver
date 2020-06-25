@@ -68,6 +68,14 @@ void *run_metadata_thread(void* thread_arg) {
                 size_t omega = (size_t) std::lround(local_spots[i].z * experiment_settings.omega_angle_per_image);
                 if ((omega >= 0) && (omega < omega_range))
                 spot_count_per_image[omega]++;
+
+                if (local_spots[i].d > spot_statistics.resolution_limit) {
+                    float one_over_d2 = 1 / (local_spots[i].d * local_spots[i].d);
+                    int bin = int(spot_statistics.resolution_limit * spot_statistics.resolution_limit * one_over_d2 * spot_statistics.resolution_bins);
+
+                    spot_statistics.wilson_plot[bin] += local_spots[i].photons;
+                    spot_statistics.spots_per_resolution_ring[bin] += 1;
+                }
             }
             spot_statistics_sequence++;
             pthread_mutex_unlock(&spots_statistics_mutex);

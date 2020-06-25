@@ -110,6 +110,14 @@ struct read_only_exception : public std::exception {
 
 };
 
+struct spot_statistics_t {
+    float resolution_limit;
+    int resolution_bins;
+    std::vector<float> wilson_plot;
+    std::vector<float> spots_per_resolution_ring;
+    std::vector<float> one_over_d2;
+};
+
 void *run_writer_thread(void* thread_arg);
 void *run_metadata_thread(void* thread_arg);
 
@@ -142,8 +150,9 @@ extern std::vector<spot_t> spots;
 extern pthread_mutex_t spots_mutex;
 
 extern std::vector<double> spot_count_per_image;
-extern std::vector<double> spot_intensity_per_resolution;
+extern spot_statistics_t spot_statistics;
 extern int spot_statistics_sequence; // spot statistics sequence is incremented every time these are updated, so plot can be changed then
+
 extern pthread_mutex_t spots_statistics_mutex;
 
 #ifndef OFFLINE

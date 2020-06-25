@@ -27,6 +27,7 @@
 #include "JFWriter.h"
 #include "../bitshuffle/bitshuffle.h"
 #include "../bitshuffle/bshuf_h5filter.h"
+#include "../include/xray.h"
 
 double mean_pedestalG0[NMODULES*NCARDS];
 double mean_pedestalG1[NMODULES*NCARDS];
@@ -245,6 +246,38 @@ int jfwriter_pedestalG2() {
     return 0;
 }
 
+void reset_spot_statistics() {
+    pthread_mutex_lock(&spots_statistics_mutex);
+
+    size_t omega_range = std::lround(experiment_settings.nimages_to_write * experiment_settings.omega_angle_per_image);
+    spot_count_per_image.clear();
+    spot_count_per_image.resize(omega_range, 0);
+    spot_statistics_sequence = 0;
+    // Not ideal, but resolution of edge with smaller d is selected.
+    spot_statistics.resolution_limit = std::max(std::min(get_resolution_bottom(),get_resolution_top()),
+                                                std::min(get_resolution_left(),get_resolution_right()));
+    spot_statistics.resolution_bins = 10;
+
+    spot_statistics.wilson_plot.clear();
+    spot_statistics.wilson_plot.resize(spot_statistics.resolution_bins, 0);
+
+    spot_statistics.spots_per_resolution_ring.clear();
+    spot_statistics.spots_per_resolution_ring.resize(spot_statistics.resolution_bins, 0);
+
+    spot_statistics.one_over_d2.clear();
+
+    // Calculate 1/d^2 limits
+    float one_over_dmin2 = 1/(spot_statistics.resolution_limit*spot_statistics.resolution_limit);
+
+    for (int i = 0; i < spot_statistics.resolution_bins; i++) {
+        float one_over_d2 = i * one_over_dmin2 / (float) spot_statistics.resolution_bins;
+        spot_statistics.one_over_d2.push_back(one_over_d2);
+    }
+    // At the end, bound for last bin is provided
+    spot_statistics.one_over_d2.push_back(one_over_dmin2);
+    pthread_mutex_unlock(&spots_statistics_mutex);
+}
+
 // Arm is logic on measuring actual dataset
 int jfwriter_arm() {
     time_t now;
@@ -261,13 +294,7 @@ int jfwriter_arm() {
     writer_settings.timing_trigger = true;
     spots.clear();
 
-    // Reset statistics
-    pthread_mutex_lock(&spots_statistics_mutex);
-    size_t omega_range = std::lround(experiment_settings.nimages_to_write * experiment_settings.omega_angle_per_image);
-    spot_count_per_image.clear();
-    spot_count_per_image.resize(omega_range, 0);
-    spot_statistics_sequence = 0;
-    pthread_mutex_unlock(&spots_statistics_mutex);
+    reset_spot_statistics();
 
     return jfwriter_start();
 }

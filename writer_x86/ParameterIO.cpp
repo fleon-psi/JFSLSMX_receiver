@@ -293,14 +293,12 @@ std::map<std::string, parameter_t> detector_options = {
                        }},
         {"resolution_limit_edge", {"", PARAMETER_FLOAT, 0.0, 0.0, true,
                                [](nlohmann::json &out) { 
-                                   out = std::max(std::max(get_resolution_left(), get_resolution_right()), 
+                                   out = std::max(std::max(get_resolution_left(), get_resolution_right()),
                                                   std::max(get_resolution_top(), get_resolution_bottom()));
                                },
                                [](nlohmann::json &in) { throw read_only_exception(); },
                                "Resolution limit on 4 edges of the detector"
                        }}
-
-
 };
 
 // Set initial parameters
@@ -345,10 +343,7 @@ void set_default_parameters() {
 // Recalculates data collection parameters (summation, number of images, number of frames)
 void update_summation() {
 
-    if (experiment_settings.frame_time_detector < MAX_FRAME_TIME_HALF_SPEED_IN_US / 1e6)
-        experiment_settings.jf_full_speed = true;
-    else
-        experiment_settings.jf_full_speed = false;
+    experiment_settings.jf_full_speed = experiment_settings.frame_time_detector < MAX_FRAME_TIME_HALF_SPEED_IN_US / 1e6;
 
     experiment_settings.summation = std::lround(
             experiment_settings.frame_time / experiment_settings.frame_time_detector);
