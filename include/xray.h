@@ -56,8 +56,12 @@ inline void reciprocal_rotate(float p0[3], float p[3], float omega_in_radian) {
 
 inline float get_resolution(float lab[3]) {
     float wavelength =  WVL_1A_IN_KEV / (experiment_settings.energy_in_keV);
-    float beam_path = sqrt(lab[0]*lab[0] + lab[1]*lab[1] + lab[2]*lab[2]);
     // Assumes planar detector, 90 deg towards beam
+    float beam_path = sqrt(lab[0]*lab[0] + lab[1]*lab[1] + lab[2]*lab[2]);
+
+    // It is possible that beam center is directly on edge, so in this case a very small number (1 micron) is added to beam_path
+    // to avoid division by zero
+    if (lab[2] == beam_path) beam_path += 1e-3;
     float cos_2theta = lab[2] / beam_path;
     // cos(2theta) = cos(theta)^2 - sin(theta)^2
     // cos(2theta) = 1 - 2*sin(theta)^2
