@@ -25,7 +25,7 @@ class App extends Component {
 
   updateREST() {
     //fetch('http://' + window.location.hostname + '/jf/config', {crossDomain:true})
-      fetch('http://' + window.location.hostname + '/jf/config', {crossDomain:true})
+      fetch('/jf/config')
     .then(handleErrors)
     .then(res => res.json())
     .then(data => {
@@ -47,9 +47,11 @@ class App extends Component {
               {desc: "Pedestal G0 frames", value: data.pedestalG0_frames},
               {desc: "Pedestal G1 frames", value: data.pedestalG1_frames},
               {desc: "Pedestal G2 frames", value: data.pedestalG2_frames},
+              {desc: "Tracking ID", value: data.trackingID},
+              {desc: "Best resolution (full circle)", value: data.resolution_limit_edge}
               ]});
          var i;
-         var in_modules = []
+         var in_modules = [];
          for (i = 0; i < 8; i++) {
              var z = 2 * ( 3 - Math.floor(i / 2)) + i % 2;
             in_modules.push({name: "Module " + z,

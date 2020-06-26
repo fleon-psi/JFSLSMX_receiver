@@ -3,14 +3,15 @@ import Grid from '@material-ui/core/Grid';
 import Slider from '@material-ui/core/Slider';
 import Switch from '@material-ui/core/Switch';
 import Typography from '@material-ui/core/Typography';
+import Paper from '@material-ui/core/Paper';
 import PinchZoomPan from "react-responsive-pinch-zoom-pan";
 import SpotFindingPlot from './SpotFindingPlot.js';
 
 class Preview extends Component {
   state = {
-     contrast: 10.0,
-     image: 0,
-     logarithmic: false,
+    contrast: 10.0,
+    image: 0,
+    logarithmic: true,
   }
 
   handleChange = (event) => {
@@ -18,7 +19,7 @@ class Preview extends Component {
   };
 
   componentDidMount() {
-    this.interval = setInterval(() => this.updateImg(), 500);
+    this.interval = setInterval(() => this.updateImg(), 300);
   }
 
   componentWillUnmount() {
@@ -34,30 +35,34 @@ class Preview extends Component {
   };
 
   render() {
-     return <div style={{ margin: 'auto' }}>
+    return <div style={{ margin: 'auto' }}>
 
-        <Grid container spacing={3}>
-          <Grid item xs={1} />
-          <Grid item xs={6}>
-            <div style={{  width: '1030px', height: '1028px' }}>
+      <Grid container spacing={3}>
+        <Grid item xs={1} />
+        <Grid item xs={6}>
+          <Paper>
+            <div style={{  maxWidth: '1030px', maxHeight: '1028px' }}>
               <PinchZoomPan maxScale={4.0}>
                 {this.state.logarithmic?
-                   <img src={"http://"+ window.location.hostname + "/jf/preview_log/" + this.state.contrast + "/" + this.state.image} alt="Preview"/>:
-                   <img src={"http://"+ window.location.hostname + "/jf/preview/" + this.state.contrast + "/" + this.state.image} alt="Preview"/>}
+                    <img src={"/jf/preview_log/" + this.state.contrast + "/" + this.state.image} alt="Preview"/>:
+                    <img src={"/jf/preview/" + this.state.contrast + "/" + this.state.image} alt="Preview"/>}
               </PinchZoomPan>
             </div>
-          </Grid>
-          <Grid item xs={4}>
+          </Paper>
+        </Grid>
+        <Grid item xs={4}>
+          <Paper>
             <Typography> Contrast </Typography>
-            <Slider defaultValue={10.0} min={1.0} max={200} onChange={this.sliderMoved} valueLabelDisplay="auto" style= {{width: 300}} />
+            <Slider defaultValue={10.0} min={1.0} max={200} onChange={this.sliderMoved} valueLabelDisplay="auto" style= {{maxWidth: 300}} />
             <Typography> Log scale </Typography>
             <Switch checked={this.state.logarithmic} onChange={this.handleChange} name="logarithmic" />
             <Typography> Spot count vs. rotation angle </Typography>
             <SpotFindingPlot/>
-          </Grid>
-          <Grid item xs={1}/>
+          </Paper>
         </Grid>
-        </div>;
+        <Grid item xs={1}/>
+      </Grid>
+    </div>;
   }
 }
 
