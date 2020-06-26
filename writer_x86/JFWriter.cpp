@@ -90,8 +90,6 @@ int jfwriter_start() {
 #ifndef OFFLINE
     if (setup_detector() == 1) return 1;
 #endif
-    if (writer_settings.HDF5_prefix != "")
-        if (open_master_hdf5()) return 1;
 
     writer_thread = (pthread_t *) calloc(writer_settings.nthreads, sizeof(pthread_t));
     writer_thread_arg = (writer_thread_arg_t *) calloc(writer_settings.nthreads, sizeof(writer_thread_arg_t));
@@ -154,11 +152,11 @@ int jfwriter_stop() {
         int ret = pthread_join(metadata_thread[i], NULL);
         if (disconnect_from_power9(i)) return 1;
     }
+
 #ifndef OFFLINE
     close_detector();
 #endif
-    if (writer_settings.HDF5_prefix != "")
-        close_master_hdf5();
+
     return 0;
 }
 
@@ -249,22 +247,32 @@ int jfwriter_pedestalG2() {
 void reset_spot_statistics() {
     pthread_mutex_lock(&spots_statistics_mutex);
 
+    // Per image statistics
     size_t omega_range = std::lround(experiment_settings.nimages_to_write * experiment_settings.omega_angle_per_image);
     spot_count_per_image.clear();
     spot_count_per_image.resize(omega_range, 0);
     spot_statistics_sequence = 0;
+
+    // Resolution ring statistics
     // Not ideal, but resolution of edge with smaller d is selected.
     spot_statistics.resolution_limit = std::max(std::min(get_resolution_bottom(),get_resolution_top()),
                                                 std::min(get_resolution_left(),get_resolution_right()));
     spot_statistics.resolution_bins = 10;
 
-    spot_statistics.wilson_plot.clear();
-    spot_statistics.wilson_plot.resize(spot_statistics.resolution_bins, 0);
+    spot_statistics.intensity.clear();
+    spot_statistics.intensity.resize(spot_statistics.resolution_bins, 0);
 
-    spot_statistics.spots_per_resolution_ring.clear();
-    spot_statistics.spots_per_resolution_ring.resize(spot_statistics.resolution_bins, 0);
+    spot_statistics.mean_intensity.clear();
+    spot_statistics.mean_intensity.resize(spot_statistics.resolution_bins, 0);
+
+    spot_statistics.log_mean_intensity.clear();
+    spot_statistics.log_mean_intensity.resize(spot_statistics.resolution_bins, 0);
+
+    spot_statistics.count.clear();
+    spot_statistics.count.resize(spot_statistics.resolution_bins, 0);
 
     spot_statistics.one_over_d2.clear();
+    spot_statistics.mean_one_over_d2.clear();
 
     // Calculate 1/d^2 limits
     float one_over_dmin2 = 1/(spot_statistics.resolution_limit*spot_statistics.resolution_limit);
@@ -275,6 +283,9 @@ void reset_spot_statistics() {
     }
     // At the end, bound for last bin is provided
     spot_statistics.one_over_d2.push_back(one_over_dmin2);
+    for (int i = 0; i < spot_statistics.resolution_bins; i++)
+        spot_statistics.mean_one_over_d2.push_back((spot_statistics.one_over_d2[i+1]+spot_statistics.one_over_d2[i])/2.0);
+
     pthread_mutex_unlock(&spots_statistics_mutex);
 }
 
@@ -292,15 +303,24 @@ int jfwriter_arm() {
     }
 
     writer_settings.timing_trigger = true;
-    spots.clear();
 
+    // Reset spots vector (purge spots found previously)
+    spots.clear();
+    // and also reset statistics
     reset_spot_statistics();
+
+    // Master HDF5 file is only saved, when going through arm/disarm
+    // This is explicitly to avoid writing master HDF5 file for pedestal
+    if (writer_settings.HDF5_prefix != "")
+        if (open_master_hdf5()) return 1;
 
     return jfwriter_start();
 }
 
 int jfwriter_disarm() {
     int err = jfwriter_stop();
+
+    // Make log to InfluxDB
     if (!err) {
         if (experiment_settings.pedestalG0_frames > 0) {
             calc_mean_pedestal(gain_pedestal.pedeG0, mean_pedestalG0);
@@ -309,5 +329,10 @@ int jfwriter_disarm() {
         }
         log_measurement();
     }
+
+    // Close master file - see comment above
+    if (writer_settings.HDF5_prefix != "")
+        if (close_master_hdf5()) return 1;
+
     return err;
 }

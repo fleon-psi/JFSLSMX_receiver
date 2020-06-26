@@ -21,8 +21,6 @@
 #include <map>
 #include <cmath>
 
-
-
 #include "JFWriter.h"
 
 #define API_VERSION "jf-0.1.0"
@@ -334,25 +332,62 @@ void fetch_preview_log(const Pistache::Rest::Request &request, Pistache::Http::R
 
 }
 
-void fetch_spot_count_per_image(const Pistache::Rest::Request &request, Pistache::Http::ResponseWriter response) {
+void fetch_spot(const Pistache::Rest::Request &request, Pistache::Http::ResponseWriter response) {
     response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
+    auto variable = request.param(":variable").as<std::string>();
 
+    nlohmann::json j;
     pthread_mutex_lock(&spots_statistics_mutex);
-    nlohmann::json j = spot_count_per_image;
+
+    if (variable == "sequence")
+        j["sequence"] = spot_statistics_sequence; 
+    else if (variable == "per_angle")
+        j["count"] = spot_count_per_image;
+    else if (variable == "resolution") {
+        j["count"] = spot_statistics.count;
+        j["meanI"] = spot_statistics.mean_intensity;
+        j["log_meanI"] = spot_statistics.log_mean_intensity;
+        j["one_over_d2"] = spot_statistics.mean_one_over_d2;
+        j["wilsonB"] = spot_statistics.wilson_B;
+    } else if (variable == "list") {
+        for (int i = 0; i < spots.size(); i++) {
+            nlohmann::json spot_json;
+            spot_json["x"] = spots[i].x;
+            spot_json["y"] = spots[i].y;
+            spot_json["z"] = spots[i].z;
+            spot_json["module"] = (int)(spots[i].x/1030.0) + 2 * (int)(spots[i].y/514.0);
+            spot_json["photons"] = spots[i].photons;
+            spot_json["lines"] = spots[i].max_line - spots[i].min_line + 1;
+            spot_json["cols"] = spots[i].max_col - spots[i].min_col + 1;
+            spot_json["frames"] = spots[i].last_frame - spots[i].first_frame + 1;
+            j.push_back(spot_json);
+        }
+    } else if (variable == "reciprocal") {
+        for (int i = 0; i < spots.size(); i++) {
+            j["x"].push_back(spots[i].q[0]);
+            j["y"].push_back(spots[i].q[1]);
+            j["z"].push_back(spots[i].q[2]);
+        }
+    }
+
     pthread_mutex_unlock(&spots_statistics_mutex);
 
     response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));
 }
 
-void fetch_spot_sequence(const Pistache::Rest::Request &request, Pistache::Http::ResponseWriter response) {
+void fetch_spot_xds(const Pistache::Rest::Request &request, Pistache::Http::ResponseWriter response) {
     response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
 
-    pthread_mutex_lock(&spots_statistics_mutex);
-    nlohmann::json j;
-    j["sequence"] = spot_statistics_sequence;
-    pthread_mutex_unlock(&spots_statistics_mutex);
+    std::string spot_xds;
 
-    response.send(Pistache::Http::Code::Ok, j.dump(), MIME(Application, Json));
+    for (int i = 0; i < spots.size(); i++) {
+        int module = (int)(spots[i].x/1030.0) + 2 * (int)(spots[i].y/514.0);
+        spot_xds += std::to_string(spots[i].x) + " " + std::to_string(spots[i].y) + " " + std::to_string(spots[i].z) + " ";
+        spot_xds += std::to_string(spots[i].photons) + " " + std::to_string(module) + " " + std::to_string(spots[i].d) + "\n";
+    }
+    std::cout << spot_xds.size() << std::endl;
+    response.send(Pistache::Http::Code::Ok);
+    // response.send(Pistache::Http::Code::Ok, spot_xds, MIME(Text, Plain));
 }
 
 // HTTP preflight authorization is required for PUT REST calls to be made from JavaScript in a web browser (cross-origin)
@@ -418,13 +453,13 @@ int main() {
     Pistache::Rest::Routes::Get(router, "/preview/:variable/:x", Pistache::Rest::Routes::bind(&fetch_preview));
     Pistache::Rest::Routes::Get(router, "/preview_log/:variable/:x", Pistache::Rest::Routes::bind(&fetch_preview_log));
 
-    Pistache::Rest::Routes::Get(router, "/spot_count", Pistache::Rest::Routes::bind(&fetch_spot_count_per_image));
-    Pistache::Rest::Routes::Get(router, "/spot_sequence", Pistache::Rest::Routes::bind(&fetch_spot_sequence));
+    Pistache::Rest::Routes::Get(router, "/spot/:variable", Pistache::Rest::Routes::bind(&fetch_spot));
+    Pistache::Rest::Routes::Get(router, "/SPOT.XDS", Pistache::Rest::Routes::bind(&fetch_spot_xds));
 
     auto opts = Pistache::Http::Endpoint::options().threads(PISTACHE_THREADS);
     Pistache::Http::Endpoint server(addr);
     server.init(opts);
 
     server.setHandler(router.handler());
-    server.serve();
+        server.serve();
 }

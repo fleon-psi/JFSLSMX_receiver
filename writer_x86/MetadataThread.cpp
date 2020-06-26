@@ -16,11 +16,35 @@
 
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 
 #include <arpa/inet.h> // for ntohl
 #include <unistd.h>    // for usleep
 
 #include "JFWriter.h"
+
+
+float calculate_wilson_b() {
+
+    float sum_x = 0.0;
+    float sum_y = 0.0;
+    float sum_x2 = 0.0;
+    float sum_xy = 0.0;
+
+    for (int i = 0; i < spot_statistics.resolution_bins; i++) {
+        sum_x += spot_statistics.mean_one_over_d2[i];
+        sum_y += spot_statistics.log_mean_intensity[i];
+        sum_x2 += spot_statistics.mean_one_over_d2[i]*spot_statistics.mean_one_over_d2[i];
+        sum_xy += spot_statistics.mean_one_over_d2[i]*spot_statistics.log_mean_intensity[i];
+    }
+    float numerator = (spot_statistics.resolution_bins * sum_xy - sum_x * sum_y);
+    float denominator =  (spot_statistics.resolution_bins * sum_x2 - sum_x * sum_x);
+    // This is fitting ln<i> = a + b (1/d^2)
+    // B = -b 2 in XDS terms
+    if (denominator != 0) return - 2 * (numerator/ denominator);
+    // Protect for denominator == 0
+    else return -1;
+}
 
 void *run_metadata_thread(void* thread_arg) {
     // Read thread ID
@@ -73,10 +97,20 @@ void *run_metadata_thread(void* thread_arg) {
                     float one_over_d2 = 1 / (local_spots[i].d * local_spots[i].d);
                     int bin = int(spot_statistics.resolution_limit * spot_statistics.resolution_limit * one_over_d2 * spot_statistics.resolution_bins);
 
-                    spot_statistics.wilson_plot[bin] += local_spots[i].photons;
-                    spot_statistics.spots_per_resolution_ring[bin] += 1;
+                    spot_statistics.intensity[bin] += local_spots[i].photons;
+                    spot_statistics.count[bin] += 1;
                 }
             }
+
+            // Calculate Wilson plot
+            // according to XDS CORRECT.LP
+            // needs linear regression of ln(<i>) in function of (1/(4d^2))
+            for (int i = 0; i < spot_statistics.resolution_bins; i++) {
+                spot_statistics.mean_intensity[i] = spot_statistics.intensity[i]/ spot_statistics.count[i];
+                spot_statistics.log_mean_intensity[i] = log(spot_statistics.mean_intensity[i]);
+            }
+            spot_statistics.wilson_B = calculate_wilson_b();
+
             spot_statistics_sequence++;
             pthread_mutex_unlock(&spots_statistics_mutex);
         }

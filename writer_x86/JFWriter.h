@@ -112,10 +112,14 @@ struct read_only_exception : public std::exception {
 
 struct spot_statistics_t {
     float resolution_limit;
+    float wilson_B;
     int resolution_bins;
-    std::vector<float> wilson_plot;
-    std::vector<float> spots_per_resolution_ring;
+    std::vector<float> intensity;
+    std::vector<float> mean_intensity;
+    std::vector<float> log_mean_intensity;
+    std::vector<size_t> count;
     std::vector<float> one_over_d2;
+    std::vector<float> mean_one_over_d2;
 };
 
 void *run_writer_thread(void* thread_arg);
