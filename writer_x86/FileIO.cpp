@@ -704,8 +704,8 @@ int write_spots() {
     tmp = (double *) realloc(tmp, 2 * spots.size()*sizeof(double));
 
     for (int i = 0; i < spots.size(); i++) {
-        tmp[2 * i] = spots[i].max_col - spots[i].min_col;
-        tmp[2 * i + 1] = spots[i].max_line - spots[i].min_line;
+        tmp[2 * i] = spots[i].max_col - spots[i].min_col + 1;
+        tmp[2 * i + 1] = spots[i].max_line - spots[i].min_line + 1;
     }
     saveDouble2D(grp, "spot_size", tmp, "", spots.size(), 2);
 
