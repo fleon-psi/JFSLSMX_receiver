@@ -31,11 +31,12 @@ void merge_spots(spot_t &spot1, const spot_t spot2) {
 
         spot1.photons = spot1.photons + spot2.photons;
 
+        if (spot2.min_line < spot1.min_line) spot1.min_line = spot2.min_line;
+        if (spot2.min_col < spot1.min_col) spot1.min_col = spot2.min_col;
+
         if (spot2.max_line > spot1.max_line) spot1.max_line = spot2.max_line;
         if (spot2.max_col > spot1.max_col) spot1.max_col = spot2.max_col;
 
-        if (spot2.min_line > spot1.min_line) spot1.min_line = spot2.min_line;
-        if (spot2.min_col > spot1.min_col) spot1.min_col = spot2.min_col;
         if (spot2.first_frame < spot1.first_frame) spot1.first_frame = spot2.first_frame;
         if (spot2.last_frame > spot1.last_frame) spot1.last_frame = spot2.last_frame;
 }
