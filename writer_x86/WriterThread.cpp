@@ -110,10 +110,11 @@ void *run_writer_thread(void* thread_arg) {
                 if (frame_id % PREVIEW_STRIDE == 0) {
                     if (experiment_settings.pixel_depth == 4) {
                         for (int i = 0; i < XPIXEL * YPIXEL / NCARDS; i++)
-                            preview[i+card_id * (XPIXEL * YPIXEL / NCARDS)] = ((int32_t *) ib_buffer_location)[i];
+                            // Card id needs flipping, to correctly get up-down
+                            preview[i+(1-card_id) * (XPIXEL * YPIXEL / NCARDS)] = ((int32_t *) ib_buffer_location)[i];
                     } else {
                         for (int i = 0; i < XPIXEL * YPIXEL / NCARDS; i++)
-                            preview[i+card_id * (XPIXEL * YPIXEL / NCARDS)] = ((int16_t *) ib_buffer_location)[i];
+                            preview[i+(1-card_id) * (XPIXEL * YPIXEL / NCARDS)] = ((int16_t *) ib_buffer_location)[i];
                     }
                 }
 
