@@ -194,6 +194,11 @@ std::map<std::string, parameter_t> detector_options = {
                                [](nlohmann::json &in) {  experiment_settings.strong_pixel = in.get<double>(); },
                                "Strong pixel parameter for spot finding"
                        }},
+        {"spot_finding_dmin",{"A", PARAMETER_FLOAT, 0.0, 20.0, false,
+                                             [](nlohmann::json &out) { out = experiment_settings.spot_finding_resolution_limit; },
+                                             [](nlohmann::json &in) {  experiment_settings.spot_finding_resolution_limit = in.get<double>(); },
+                                             "High resolution limit for spot finding"
+                                     }},
         {"spot_finding_max_depth",{"", PARAMETER_UINT, 1.0, NIMAGES_PER_STREAM, false,
                                [](nlohmann::json &out) { out = experiment_settings.max_spot_depth; },
                                [](nlohmann::json &in) {  experiment_settings.max_spot_depth = in.get<uint16_t>(); },
@@ -319,6 +324,8 @@ void set_default_parameters() {
     experiment_settings.enable_spot_finding = true;
     experiment_settings.connect_spots_between_frames = true;
     experiment_settings.strong_pixel = 3.0;
+    experiment_settings.spot_finding_resolution_limit = 2.0;
+
     writer_settings.compression = JF_COMPRESSION_BSHUF_LZ4;
 
     writer_settings.write_mode = JF_WRITE_HDF5;
