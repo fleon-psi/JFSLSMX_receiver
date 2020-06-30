@@ -49,9 +49,9 @@ inline void lab_to_reciprocal(float p[3], float lab[3], float one_over_wavelengt
 // Assume m2 = {0, 1, 0}
 // The function moves p back into origin of rotation
 inline void reciprocal_rotate(float p0[3], float p[3], float omega_in_radian) {
-    p0[0] = cos(omega_in_radian) * p[0] - sin(omega_in_radian) * p[2];
-    p0[1] = p[1];
-    p0[2] = sin(omega_in_radian) * p[0] + cos(omega_in_radian) * p[2];
+    p0[0] = p[0];
+    p0[1] = cos(omega_in_radian) * p[1] - sin(omega_in_radian) * p[2];
+    p0[2] = sin(omega_in_radian) * p[1] + cos(omega_in_radian) * p[2];
 }
 
 inline float get_resolution(float lab[3]) {
