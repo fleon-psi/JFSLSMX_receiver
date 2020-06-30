@@ -45,7 +45,7 @@ int trigger_rpi() {
 
     auto sync = Pistache::Async::whenAll(responses.begin(), responses.end());
     Pistache::Async::Barrier<std::vector<Pistache::Http::Response>> barrier(sync);
-    barrier.wait_for(std::chrono::seconds(5));
+    barrier.wait_for(std::chrono::seconds(1));
 
     client.shutdown();
     return retval;
@@ -122,11 +122,29 @@ int trigger_rpi() {
 } */
 
 
+bool is_detector_idle() {
+    auto result = det->getDetectorStatus();
+    if (!result.equal()) return false;
+    if (result.squash(slsDetectorDefs::runStatus::ERROR) == slsDetectorDefs::runStatus::IDLE) return true;
+    else return false;
+}
+
+void stop_detector() {
+    if (!is_detector_idle()) {
+        det->stopDetector();
+        while (!is_detector_idle()) usleep(10000);
+    }
+}
+
 int setup_detector() {
 #ifndef OFFLINE
-        det->stopDetector();
+        std::cout << "Stopping detector" << std::endl;
+        stop_detector();
+        std::cout << "Reset frame number" << std::endl;
         det->setStartingFrameNumber(1);
+        std::cout << "Set number of frames" << std::endl;
         det->setNumberOfFrames(experiment_settings.nframes_to_collect + DELAY_FRAMES_STOP_AND_QUIT+1);
+        std::cout << "Check detector size" << std::endl;
         if (det->size() != NMODULES * NCARDS) {
             std::cerr << "Mismatch in detector size" << std::endl;
             return 1;
@@ -135,11 +153,13 @@ int setup_detector() {
         std::chrono::microseconds frame_time = std::chrono::microseconds(std::lround(experiment_settings.frame_time_detector*1e6));
         std::chrono::microseconds exp_time = std::chrono::microseconds(std::lround(experiment_settings.count_time_detector*1e6));
 
+        std::cout << "Set speed" << std::endl;
         if (experiment_settings.jf_full_speed)
             det->setSpeed(slsDetectorDefs::speedLevel::FULL_SPEED);
         else
             det->setSpeed(slsDetectorDefs::speedLevel::HALF_SPEED);
-        
+
+        std::cout << "Set mode" << std::endl;
         if (experiment_settings.conversion_mode == MODE_PEDEG1) {
             frame_time = std::chrono::milliseconds(10); // 100 Hz
             det->setSettings(slsDetectorDefs::detectorSettings::FORCESWITCHG1);
@@ -150,10 +170,11 @@ int setup_detector() {
         }
         else
             det->setSettings(slsDetectorDefs::detectorSettings::DYNAMICGAIN);
-        
+        std::cout << "Set frame/exp time" << std::endl;
         det->setPeriod(frame_time);
         det->setExptime(exp_time);
 
+        std::cout << "Set timing" << std::endl;
         if (writer_settings.timing_trigger)
             det->setTimingMode(slsDetectorDefs::timingMode::TRIGGER_EXPOSURE);
         else
@@ -165,12 +186,14 @@ int setup_detector() {
 int trigger_detector() {
 #ifndef OFFLINE
         if (writer_settings.timing_trigger) {
+            std::cout << "Start detector" << std::endl;
             det->startDetector();
             // sleep 200 ms is necessary for SNAP setup
             // TODO: Likely 20-50 us would be enough
             usleep(200000);
             trigger_rpi();
         } else {
+            std::cout << "Start detector" << std::endl;
             usleep(200000);
             det->startDetector();
         } 
@@ -180,7 +203,9 @@ int trigger_detector() {
 
 int close_detector() {
 #ifndef OFFLINE
-        det->stopDetector();
+        std::cout << "Stop detector" << std::endl;
+        stop_detector();
+        std::cout << "Return to dynamic gain" << std::endl;
         det->setSettings(slsDetectorDefs::detectorSettings::DYNAMICGAIN);
 #endif
         return 0;
