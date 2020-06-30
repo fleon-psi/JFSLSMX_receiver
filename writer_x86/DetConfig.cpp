@@ -125,7 +125,10 @@ int trigger_rpi() {
 bool is_detector_idle() {
     auto result = det->getDetectorStatus();
     if (!result.equal()) return false;
-    if (result.squash(slsDetectorDefs::runStatus::ERROR) == slsDetectorDefs::runStatus::IDLE) return true;
+    auto val = result.squash(slsDetectorDefs::runStatus::ERROR);
+    if ((val == slsDetectorDefs::runStatus::IDLE) ||
+    (val == slsDetectorDefs::runStatus::STOPPED) ||
+    (val == slsDetectorDefs::runStatus::RUN_FINISHED)) return true;
     else return false;
 }
 
@@ -190,11 +193,11 @@ int trigger_detector() {
             det->startDetector();
             // sleep 200 ms is necessary for SNAP setup
             // TODO: Likely 20-50 us would be enough
-            usleep(200000);
+            usleep(500000);
             trigger_rpi();
         } else {
             std::cout << "Start detector" << std::endl;
-            usleep(200000);
+            usleep(500000);
             det->startDetector();
         } 
 #endif
