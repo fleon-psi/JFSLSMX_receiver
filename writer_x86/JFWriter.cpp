@@ -293,14 +293,15 @@ void reset_spot_statistics() {
 int jfwriter_arm() {
     time_t now;
     time(&now);
+
+    if (((long)(now - time_pedestalG1.tv_sec) > PEDESTAL_TIME_CUTOFF)
+        || ((long)(now - time_pedestalG2.tv_sec) > PEDESTAL_TIME_CUTOFF)) {
+        if (jfwriter_pedestalG2()) return 1;
+        if (jfwriter_pedestalG1()) return 1;
+    }
     if (((long)(now - time_pedestalG0.tv_sec) > PEDESTAL_TIME_CUTOFF)
         && (experiment_settings.pedestalG0_frames == 0))
         if (jfwriter_pedestalG0()) return 1;
-    if (((long)(now - time_pedestalG1.tv_sec) > PEDESTAL_TIME_CUTOFF)
-        || ((long)(now - time_pedestalG2.tv_sec) > PEDESTAL_TIME_CUTOFF)) {
-        if (jfwriter_pedestalG1()) return 1;
-        if (jfwriter_pedestalG2()) return 1;
-    }
 
     writer_settings.timing_trigger = true;
 

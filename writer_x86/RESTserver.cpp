@@ -69,18 +69,18 @@ void detector_command(const Pistache::Rest::Request &request, Pistache::Http::Re
             jfwriter_disarm();
         daq_state = STATE_CHANGE;
         set_default_parameters();
-        if (jfwriter_pedestalG0()) daq_state = STATE_ERROR;
+        if (jfwriter_pedestalG2()) daq_state = STATE_ERROR;
         else if (jfwriter_pedestalG1()) daq_state = STATE_ERROR;
-        else if (jfwriter_pedestalG2()) daq_state = STATE_ERROR;
+        else if (jfwriter_pedestalG0()) daq_state = STATE_ERROR;
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_READY) && (command == "arm")) {
         daq_state = STATE_CHANGE;
         if (jfwriter_arm()) daq_state = STATE_ERROR;
         else daq_state = STATE_ACQUIRE;
     } else if ((daq_state == STATE_READY) && (command == "pedestal")) {
-        if (jfwriter_pedestalG0()) daq_state = STATE_ERROR;
+        if (jfwriter_pedestalG2()) daq_state = STATE_ERROR;
         else if (jfwriter_pedestalG1()) daq_state = STATE_ERROR;
-        else if (jfwriter_pedestalG2()) daq_state = STATE_ERROR;
+        else if (jfwriter_pedestalG0()) daq_state = STATE_ERROR;
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_ACQUIRE) && (command == "disarm")) {
         daq_state = STATE_CHANGE;
