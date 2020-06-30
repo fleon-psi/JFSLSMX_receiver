@@ -89,6 +89,7 @@ struct experiment_settings_t {
 
     bool     enable_spot_finding;          // true = spot finding is ON
     bool     connect_spots_between_frames; // true = rotation measurement, false = raster, jet
+    double   spot_finding_resolution_limit; // Resolution limit, above which spots are discarded
     double   strong_pixel;                 // STRONG_PIXEL in XDS
     uint16_t max_spot_depth;               // Maximum images per spot
     uint16_t min_pixels_per_spot;          // Minimum pixels per spot
