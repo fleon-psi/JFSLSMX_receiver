@@ -116,8 +116,9 @@ void filter32(int32_t *in) {
 int read_frame(int frame_number, int32_t *output) {
     herr_t h5ret;
 
-    int nfile = frame_number / cache_nframes_per_files;
-    int nframe_in_file = frame_number % cache_nframes_per_files;
+    // XDS is starting numbering from 1, while HDF5 from 0
+    int nfile = (frame_number-1) / cache_nframes_per_files;
+    int nframe_in_file = (frame_number-1) % cache_nframes_per_files;
     
     char buff[255];
     snprintf(buff, 255, "/entry/data/data_%06d", nfile+1);
