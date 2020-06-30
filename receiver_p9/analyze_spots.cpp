@@ -138,11 +138,7 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
             spot_t spot = add_pixel(strong_pixel_maps, i, iterator, connect_frames);
 
             // Spot has at least minimum number of pixels
-<<<<<<< HEAD
             if (spot.last_frame - spot.first_frame + spot.max_col - spot.min_col + spot.max_line - spot.min_line + 1 > experiment_settings.min_pixels_per_spot) {
-=======
-            if (spot.last_frame - spot.first_frame + spot.max_col - spot.min_col + spot.max_line - spot.min_line + 1 > experiment_settings.min_pixels_per_spot)
->>>>>>> 26914457ac3f19c782e6c23ef81e737c4a2053f9
                 // Apply pixel count cut-off and cut-off of number of frames, which spot can span
                 // (spots present in most frames, are likely to be either bad pixels or in spindle axis)
                 spot.x = spot.x / spot.photons;
