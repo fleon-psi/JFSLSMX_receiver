@@ -50,7 +50,7 @@ std::map<std::string, parameter_t> detector_options = {
                                    }},
                                "Internal frame time of the detector"
                        }},
-        {"count_time_detector", {"us", PARAMETER_FLOAT, MIN_COUNT_TIME_IN_US, 0.001, false,
+        {"count_time_detector", {"us", PARAMETER_FLOAT, MIN_COUNT_TIME_IN_US, 970 , false,
                                [](nlohmann::json &out) { out = experiment_settings.count_time_detector * 1000000.0; },
                                [](nlohmann::json &in) {
                                    if (experiment_settings.count_time_detector != in.get<double>() / 1000000.0) {
@@ -306,6 +306,8 @@ void set_default_parameters() {
     experiment_settings.frame_time_detector = 500 / 1e6;
     experiment_settings.count_time_detector = 470 / 1e6;
 
+    experiment_settings.beamline_delay = 180;
+
     experiment_settings.frame_time = 500 / 1e6;
     experiment_settings.nimages_to_write = 1000;
     experiment_settings.ntrigger = 1;
@@ -317,12 +319,13 @@ void set_default_parameters() {
     experiment_settings.enable_spot_finding = true;
     experiment_settings.connect_spots_between_frames = true;
     experiment_settings.strong_pixel = 3.0;
+    writer_settings.compression = JF_COMPRESSION_BSHUF_LZ4;
 
     writer_settings.write_mode = JF_WRITE_HDF5;
     writer_settings.images_per_file = 1000;
     writer_settings.nthreads = NCARDS * 8; // Spawn 8 writer threads per card
     writer_settings.timing_trigger = true;
-    writer_settings.hdf18_compat = false;
+    writer_settings.hdf18_compat = true;
     writer_settings.default_path = "/mnt/ssd/";
     writer_settings.influxdb_url="http://mx-jungfrau-1:8086";
 
