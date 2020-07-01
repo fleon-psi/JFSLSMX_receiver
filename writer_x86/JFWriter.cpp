@@ -193,7 +193,7 @@ int jfwriter_pedestalG0() {
     experiment_settings.nimages_to_write = 0;
     experiment_settings.ntrigger = 0;
     experiment_settings.conversion_mode = MODE_PEDEG0;
-    writer_settings.timing_trigger = false;
+    writer_settings.timing_trigger = true;
 
     if (jfwriter_start() == 1) return 1;
     if (jfwriter_stop() == 1) return 1;
@@ -214,7 +214,7 @@ int jfwriter_pedestalG1() {
     experiment_settings.nimages_to_write = 0;
     experiment_settings.ntrigger = 0;
     experiment_settings.conversion_mode = MODE_PEDEG1;
-    writer_settings.timing_trigger = false;
+    writer_settings.timing_trigger = true;
 
     if (jfwriter_start() == 1) return 1;
     if (jfwriter_stop() == 1) return 1;
@@ -235,7 +235,7 @@ int jfwriter_pedestalG2() {
     experiment_settings.nimages_to_write = 0;
     experiment_settings.ntrigger = 0;
     experiment_settings.conversion_mode = MODE_PEDEG2;
-    writer_settings.timing_trigger = false;
+    writer_settings.timing_trigger = true;
 
     if (jfwriter_start() == 1) return 1;
     if (jfwriter_stop() == 1) return 1;
@@ -300,15 +300,6 @@ void reset_spot_statistics() {
 int jfwriter_arm() {
     time_t now;
     time(&now);
-
-    if (((long)(now - time_pedestalG1.tv_sec) > PEDESTAL_TIME_CUTOFF)
-        || ((long)(now - time_pedestalG2.tv_sec) > PEDESTAL_TIME_CUTOFF)) {
-        if (jfwriter_pedestalG2()) return 1;
-        if (jfwriter_pedestalG1()) return 1;
-    }
-    if (((long)(now - time_pedestalG0.tv_sec) > PEDESTAL_TIME_CUTOFF)
-        && (experiment_settings.pedestalG0_frames == 0))
-        if (jfwriter_pedestalG0()) return 1;
 
     writer_settings.timing_trigger = true;
 
