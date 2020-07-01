@@ -70,7 +70,7 @@ __global__ void find_spots_colspot(T *in, strong_pixel *out, float strong, int N
         }
 
         // do calculations for lines NBY to MODULE_LINES - NBY
-        for (size_t line = NBY; line < LINES - NBY; line++) {
+        for (int16_t line = NBY; line < LINES - NBY; line++) {
 
             // sum and sum of squares for (2*NBX+1) x (2*NBY+1) elements
             int64_t sum  = sum_vert[0];
@@ -81,7 +81,7 @@ __global__ void find_spots_colspot(T *in, strong_pixel *out, float strong, int N
                 sum2 += sum2_vert[i];
             }
 
-            for (int col = NBX; col < COLS - NBX; col++) {
+            for (int16_t col = NBX; col < COLS - NBX; col++) {
 
                 // At all cost division and sqrt must be avoided
                 // as performance penalty is significant (2x drop)
@@ -90,10 +90,10 @@ __global__ void find_spots_colspot(T *in, strong_pixel *out, float strong, int N
                 float var = (2*NBX+1) * (2*NBY+1) * sum2 - (sum * sum); // This should be divided by (float) ((2*NBX+1) * (2*NBY+1)-1)
 
                 float mean = sum; // Should be divided (float)((2*NBX+1) * (2*NBY+1));
-                float in_minus_mean = in[(line0 + line)*COLS+col] * (float)((2*NBX+1) * (2*NBY+1)) - mean; // Should be divided (float)((2*NBX+1) * (2*NBY+1));
+                float in_minus_mean = in[(line0 + line)*COLS+col] * ((2*NBX+1) * (2*NBY+1)) - sum; // Should be divided (float)((2*NBX+1) * (2*NBY+1));
 
                 if ((in_minus_mean > 0.0f) && // pixel value is larger than mean
-                    (mean > 0.0f) &&          // mean is larger than zero (no bad pixels)
+                    (sum > 0) &&          // mean is larger than zero (no bad pixels)
                     (in[(line0 + line)*COLS+col] > 0) && // pixel is not bad pixel and is above 0
                     (in_minus_mean * in_minus_mean > var * threshold)) {
                        // Save line, column and photon count in output table

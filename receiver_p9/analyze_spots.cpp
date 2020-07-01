@@ -63,7 +63,7 @@ spot_t add_pixel(strong_pixel_maps_t &strong_pixel_maps, size_t i, strong_pixel_
     strong_pixel_maps[i].erase(it); // Remove strong pixel from the dictionary, so it is not processed again
 
     ret_value.x = col * photons; // position is weighted by number of photon counts
-    ret_value.y = (line + (i%2) * LINES) * photons;
+    ret_value.y = line * photons;
     // Y has to be corrected for vertical position of the fragment
     ret_value.z = (i / 2) * photons;
     ret_value.photons = photons;
@@ -105,6 +105,12 @@ spot_t add_pixel(strong_pixel_maps_t &strong_pixel_maps, size_t i, strong_pixel_
         if ((it2 = strong_pixel_maps[i+2].find(coordxy_t(col  , line))) != strong_pixel_maps[i+2].end())
             merge_spots(ret_value, add_pixel(strong_pixel_maps, i+2, it2, connect_frames));
     }
+
+    if (connect_frames && (i - 2 > 0)) {
+        if ((it2 = strong_pixel_maps[i-2].find(coordxy_t(col  , line))) != strong_pixel_maps[i-2].end())
+            merge_spots(ret_value, add_pixel(strong_pixel_maps, i-2, it2, connect_frames));
+    }
+
     return ret_value;
 }
 
@@ -124,10 +130,9 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
         // GPU kernel sets col to -1 for next element after last strong pixel
         // Photons equal zero could mean that kernel was not at all executed
         while ((k < MAX_STRONG) && (host_out[addr + k].col >= 0) && (host_out[addr + k].line >= 0) && (host_out[addr+k].photons > 0)) {
-            coordxy_t key = coordxy_t(host_out[addr + k].col, host_out[addr + k].line);
+            coordxy_t key = coordxy_t(host_out[addr + k].col, host_out[addr + k].line + (i%2) * LINES);
             if (bad_pixels.find(key) == bad_pixels.end())
-//                  strong_pixel_maps[i][key] = host_out[addr + k].photons / ((2*NBX+1)*(2*NBY+1));
-                strong_pixel_maps[i][key] = host_out[addr + k].photons;
+                strong_pixel_maps[i][key] = host_out[addr + k].photons / ((2*NBX+1)*(2*NBY+1));
             k++;
         }
     }
