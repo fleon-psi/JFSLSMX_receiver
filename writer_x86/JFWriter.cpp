@@ -186,6 +186,7 @@ void count_bad_pixel() {
 }
 
 int jfwriter_pedestalG0() {
+    sleep(1); // Added to ensure that there is enough time between pedestal measurements
     experiment_settings_t tmp_settings = experiment_settings;
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG0_frames;
 
@@ -202,10 +203,12 @@ int jfwriter_pedestalG0() {
     calc_mean_pedestal(gain_pedestal.pedeG0, mean_pedestalG0);
     count_bad_pixel();
     log_pedestal_G0();
+    sleep(1); // Just for safety
     return 0;
 }
 
 int jfwriter_pedestalG1() {
+    sleep(1); // Added to ensure that there is enough time between pedestal measurements
     experiment_settings_t tmp_settings = experiment_settings;
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG1_frames;
     experiment_settings.nimages_to_write = 0;
@@ -221,10 +224,12 @@ int jfwriter_pedestalG1() {
     calc_mean_pedestal(gain_pedestal.pedeG1, mean_pedestalG1);
     count_bad_pixel();
     log_pedestal_G1();
+    sleep(1); // Just for safety
     return 0;
 }
 
 int jfwriter_pedestalG2() {
+    sleep(1); // Added to ensure that there is enough time between pedestal measurements
     experiment_settings_t tmp_settings = experiment_settings;
     experiment_settings.nframes_to_collect = experiment_settings.pedestalG2_frames;
     experiment_settings.nimages_to_write = 0;
@@ -241,6 +246,7 @@ int jfwriter_pedestalG2() {
     calc_mean_pedestal(gain_pedestal.pedeG2, mean_pedestalG2);
     count_bad_pixel();
     log_pedestal_G2();
+    sleep(1); // Just for safety
     return 0;
 }
 
@@ -255,9 +261,10 @@ void reset_spot_statistics() {
 
     // Resolution ring statistics
     // Not ideal, but resolution of edge with smaller d is selected.
-    spot_statistics.resolution_limit = std::max(std::min(get_resolution_bottom(),get_resolution_top()),
-                                                std::min(get_resolution_left(),get_resolution_right()));
-    spot_statistics.resolution_bins = 10;
+    spot_statistics.resolution_limit = std::max((float)experiment_settings.spot_finding_resolution_limit,
+            std::max(std::min(get_resolution_bottom(),get_resolution_top()),
+                                                std::min(get_resolution_left(),get_resolution_right())));
+    spot_statistics.resolution_bins = 20;
 
     spot_statistics.intensity.clear();
     spot_statistics.intensity.resize(spot_statistics.resolution_bins, 0);
