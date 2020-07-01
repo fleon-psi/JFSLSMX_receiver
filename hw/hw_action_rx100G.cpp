@@ -393,7 +393,7 @@ action_RO_config_reg *Action_Config)
 #pragma HLS INTERFACE s_axilite port=din_gmem bundle=ctrl_reg offset=0x030
 
 #pragma HLS INTERFACE m_axi port=dout_gmem bundle=host_mem offset=slave depth=512 \
-		max_read_burst_length=64  max_write_burst_length=64 latency=140
+		max_read_burst_length=64  max_write_burst_length=64 latency=200
 #pragma HLS INTERFACE s_axilite port=dout_gmem bundle=ctrl_reg offset=0x040
 
 			/*  // DDR memory Interface - CAN BE COMMENTED IF UNUSED
