@@ -106,7 +106,7 @@ spot_t add_pixel(strong_pixel_maps_t &strong_pixel_maps, size_t i, strong_pixel_
             merge_spots(ret_value, add_pixel(strong_pixel_maps, i+2, it2, connect_frames));
     }
 
-    if (connect_frames && (i - 2 > 0)) {
+    if (connect_frames && (i > 1)) {
         if ((it2 = strong_pixel_maps[i-2].find(coordxy_t(col  , line))) != strong_pixel_maps[i-2].end())
             merge_spots(ret_value, add_pixel(strong_pixel_maps, i-2, it2, connect_frames));
     }
