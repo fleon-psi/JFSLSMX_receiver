@@ -323,7 +323,8 @@ void set_default_parameters() {
     experiment_settings.conversion_mode = MODE_CONV;
     experiment_settings.enable_spot_finding = true;
     experiment_settings.connect_spots_between_frames = true;
-    experiment_settings.strong_pixel = 3.0;
+    experiment_settings.strong_pixel = 5.0;
+    experiment_settings.min_pixels_per_spot = 3.0;
     experiment_settings.spot_finding_resolution_limit = 2.0;
 
     writer_settings.compression = JF_COMPRESSION_BSHUF_LZ4;
