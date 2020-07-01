@@ -453,7 +453,7 @@ int main(int argc, char **argv) {
 
         // For conversion only packets contributing to images are written
         if ((experiment_settings.conversion_mode == MODE_CONV) && (experiment_settings.ntrigger > 0))
-            std::cout << "Images collected " << ((double)(online_statistics->good_packets / NMODULES / 128)) / (double) experiment_settings.nimages_to_write * 100.0 << "%" << std::endl;
+            std::cout << "Images collected " << ((double)(online_statistics->good_packets / NMODULES / 128)) / (double) (experiment_settings.nimages_to_write * experiment_settings.summation) * 100.0 << "%" << std::endl;
         else
             std::cout << "Frames collected " << ((double)(online_statistics->good_packets / NMODULES / 128)) / (double) experiment_settings.nframes_to_collect * 100.0 << "%" << std::endl;
 
