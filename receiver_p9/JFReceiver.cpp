@@ -461,8 +461,11 @@ int main(int argc, char **argv) {
         send(accepted_socket, online_statistics, sizeof(online_statistics_t), 0);
         // Send gain, pedestal and pixel mask
         send(accepted_socket, gain_pedestal_data, 7*NPIXEL*sizeof(uint16_t), 0);
+
         // Update bad pixel pixel list for spot finding;
         update_bad_pixel_list();
+        std::cout << "Bad pixel count " << bad_pixels.size() << std::endl;
+
         // Reset QP
         switch_to_reset(ib_settings);
         switch_to_init(ib_settings);
