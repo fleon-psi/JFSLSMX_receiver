@@ -383,11 +383,9 @@ void fetch_spot_xds(const Pistache::Rest::Request &request, Pistache::Http::Resp
     for (int i = 0; i < spots.size(); i++) {
         int module = (int)(spots[i].x/1030.0) + 2 * (int)(spots[i].y/514.0);
         spot_xds += std::to_string(spots[i].x) + " " + std::to_string(spots[i].y) + " " + std::to_string(spots[i].z) + " ";
-        spot_xds += std::to_string(spots[i].photons) + " " + std::to_string(module) + " " + std::to_string(spots[i].d) + "\n";
+        spot_xds += std::to_string(spots[i].photons) + " " + std::to_string(module) + "\n";
     }
-    std::cout << spot_xds.size() << std::endl;
-    response.send(Pistache::Http::Code::Ok);
-    // response.send(Pistache::Http::Code::Ok, spot_xds, MIME(Text, Plain));
+    response.send(Pistache::Http::Code::Ok, spot_xds, MIME(Text, Plain));
 }
 
 // HTTP preflight authorization is required for PUT REST calls to be made from JavaScript in a web browser (cross-origin)
