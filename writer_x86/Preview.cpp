@@ -31,7 +31,7 @@
 #define BLUE_MAX 0
 
 int update_jpeg_preview(std::vector<uchar> &jpeg_out, float contrast) {
-    cv::setNumThreads(4);
+    cv::setNumThreads(0);
 
     cv::Mat values(YPIXEL, XPIXEL, CV_8U);
     
@@ -60,7 +60,7 @@ int update_jpeg_preview(std::vector<uchar> &jpeg_out, float contrast) {
 }
 
 int update_jpeg_preview_log(std::vector<uchar> &jpeg_out, float contrast) {
-    cv::setNumThreads(4);
+    cv::setNumThreads(0);
 
     cv::Mat values(YPIXEL, XPIXEL, CV_8U);
     
