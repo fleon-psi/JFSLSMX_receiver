@@ -63,9 +63,8 @@ class App extends Component {
          this.setState({modules: in_modules});
     })
     .catch(error => {
-        this.setState({value: {connected: false}})
+        this.setState({connected: false})
      });
-     this.setState({contrast : this.state.contrast + 1});
   }
   
   componentDidMount() { 
@@ -99,7 +98,7 @@ class App extends Component {
                 <Preview/>}
             <br/></div>
          :
-            <h1> Detector server not running </h1>}
+            <h1> Error connecting to detector server </h1>}
      </div>
   }
 }
