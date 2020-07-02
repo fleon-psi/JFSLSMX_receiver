@@ -115,14 +115,14 @@ void *run_snap_thread(void *in_threadarg) {
     if (rc) std::cerr << "FPGA: Action failed" << std::endl;
 
     std::cout << "FPGA: Action done" << std::endl;
-    sleep(180);
+    //sleep(180);
 
     // Reset is necessary to purge FIFO for ethernet interface
-    std::cout << "FPGA: Reset ethernet FIFO" << std::endl;
-    mjob.mode = MODE_RESET;
-    snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
-    rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
-    if (rc) std::cerr << "FPGA: Reset failed" << std::endl;
+    //std::cout << "FPGA: Reset ethernet FIFO" << std::endl;
+    //mjob.mode = MODE_RESET;
+    //snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
+    //rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
+    //if (rc) std::cerr << "FPGA: Reset failed" << std::endl;
 
     pthread_exit(0);
 }
