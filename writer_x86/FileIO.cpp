@@ -40,13 +40,13 @@ hid_t data_hdf5_dataspace;
 
 pthread_mutex_t hdf5_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-inline std::string only_file_name(std::string path) {
+inline std::string only_file_name(std::string const& path) {
     int pos = path.rfind("/");
     if (pos != std::string::npos) return path.substr(pos+1);
     else return path;
 }
 
-int make_dir(std::string path) {
+int make_dir(std::string const& path) {
     int pos = path.rfind("/");
     if (pos != std::string::npos) {
         std::string directory = path.substr(0,pos);
@@ -63,7 +63,7 @@ int make_dir(std::string path) {
 //    return status;
 //}
 
-int addStringAttribute(hid_t location, std::string name, std::string val) {
+int addStringAttribute(hid_t location, std::string const& name, std::string const& val) {
     /* https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_attribute.c */
     hid_t aid = H5Screate(H5S_SCALAR);
     hid_t atype = H5Tcopy(H5T_C_S1);
@@ -78,7 +78,7 @@ int addStringAttribute(hid_t location, std::string name, std::string val) {
     return 0;
 }
 
-int addDoubleAttribute(hid_t location, std::string name, const double *val, int dim) {
+int addDoubleAttribute(hid_t location, std::string const& name, const double *val, int dim) {
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
     hsize_t dims[1];
     dims[0] = dim;
@@ -96,14 +96,14 @@ int addDoubleAttribute(hid_t location, std::string name, const double *val, int 
     return 0;
 }
 
-hid_t createGroup(hid_t master_file_id, std::string group, std::string nxattr) {
+hid_t createGroup(hid_t master_file_id, std::string const& group, std::string const& nxattr) {
     hid_t group_id = H5Gcreate(master_file_id, group.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
     if (nxattr != "") addStringAttribute(group_id, "NX_class", nxattr);
     return group_id;
 }
 
 // +Compress
-int saveUInt16_3D(hid_t location, std::string name, const uint16_t *val, int dim1, int dim2, int dim3, double multiplier) {
+int saveUInt16_3D(hid_t location, std::string const& name, const uint16_t *val, int dim1, int dim2, int dim3, double multiplier) {
     herr_t status;
 
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
@@ -147,7 +147,7 @@ int saveUInt16_3D(hid_t location, std::string name, const uint16_t *val, int dim
     return 0;
 }
 
-int saveString1D(hid_t location, std::string name, char *val, std::string units, int dim, int len) {
+int saveString1D(hid_t location, std::string const& name, char *val, std::string const& units, int dim, int len) {
     herr_t status;
 
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
@@ -178,7 +178,7 @@ int saveString1D(hid_t location, std::string name, char *val, std::string units,
     return 0;
 }
 
-int saveDouble1D(hid_t location, std::string name, const double *val, std::string units, int dim) {
+int saveDouble1D(hid_t location, std::string const& name, const double *val, std::string const& units, int dim) {
     herr_t status;
 
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
@@ -207,7 +207,7 @@ int saveDouble1D(hid_t location, std::string name, const double *val, std::strin
     return 0;
 }
 
-int saveDouble2D(hid_t location, std::string name, const double *val, std::string units, int dim1, int dim2) {
+int saveDouble2D(hid_t location, std::string const& name, const double *val, std::string const& units, int dim1, int dim2) {
     herr_t status;
 
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
@@ -237,7 +237,7 @@ int saveDouble2D(hid_t location, std::string name, const double *val, std::strin
     return 0;
 }
 
-int saveUInt2D(hid_t location, std::string name, const uint32_t *val, std::string units, int dim1, int dim2) {
+int saveUInt2D(hid_t location, std::string const& name, const uint32_t *val, std::string const& units, int dim1, int dim2) {
     herr_t status;
 
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
@@ -299,7 +299,7 @@ int saveUInt16_as_32_2D(hid_t location, std::string name, const uint16_t *val, s
     return 0;
 }
 
-int saveInt1D(hid_t location, std::string name, const int *val, std::string units, int dim) {
+int saveInt1D(hid_t location, std::string const& name, const int *val, std::string const& units, int dim) {
     herr_t status;
 
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
@@ -328,7 +328,8 @@ int saveInt1D(hid_t location, std::string name, const int *val, std::string unit
     return 0;
 }
 
-int saveString(hid_t location, std::string name, std::string val, std::string units = "", std::string short_name = "") {
+int saveString(hid_t location, std::string const& name, std::string const& val, std::string const& units = "", std::string const& short_name = "") {
+    std::cout << name << " " << val << std::endl;
     herr_t status;
 
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
@@ -382,12 +383,12 @@ std::string hdf5_version() {
 //}
 
 
-int saveDouble(hid_t location, std::string name, double val, std::string units = "") {
+int saveDouble(hid_t location, std::string const& name, double val, std::string const& units = "") {
     double tmp = val;
     return saveDouble1D(location, name, &tmp, units, 1);
 }
 
-int saveInt(hid_t location, std::string name, int val, std::string units = "") {
+int saveInt(hid_t location, std::string const& name, int val, std::string const& units = "") {
     int tmp = val;
     return saveInt1D(location, name, &tmp, units, 1);
 }
@@ -683,7 +684,7 @@ int write_data_files_links() {
 int write_spots() {
     hid_t grp = createGroup(master_file_id, "/entry/processing","NXcollection");
 
-    double *tmp = (double *) calloc(spots.size(),sizeof(double));
+    double *tmp = (double *) calloc(3*spots.size(),sizeof(double));
 
     for (int i = 0; i < spots.size(); i++)
         tmp[i]   = spots[i].z;
@@ -701,8 +702,6 @@ int write_spots() {
         tmp[i]   = spots[i].last_frame - spots[i].first_frame + 1;
     saveDouble1D(grp, "spot_depth", tmp, "", spots.size());
 
-    tmp = (double *) realloc(tmp, 2 * spots.size()*sizeof(double));
-
     for (int i = 0; i < spots.size(); i++) {
         tmp[2 * i] = spots[i].max_col - spots[i].min_col + 1;
         tmp[2 * i + 1] = spots[i].max_line - spots[i].min_line + 1;
@@ -714,8 +713,6 @@ int write_spots() {
         tmp[2*i+1]   = spots[i].y;
     }
     saveDouble2D(grp, "spot_coord", tmp, "", spots.size(), 2);
-
-    tmp = (double *) realloc(tmp, 3 * spots.size()*sizeof(double));
 
     for (int i = 0; i < spots.size(); i++) {
         tmp[3*i]     = spots[i].q[0];
