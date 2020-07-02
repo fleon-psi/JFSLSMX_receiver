@@ -69,9 +69,7 @@ void detector_command(const Pistache::Rest::Request &request, Pistache::Http::Re
             jfwriter_disarm();
         daq_state = STATE_CHANGE;
         set_default_parameters();
-        if (jfwriter_pedestalG2()) daq_state = STATE_ERROR;
-        else if (jfwriter_pedestalG1()) daq_state = STATE_ERROR;
-        else if (jfwriter_pedestalG0()) daq_state = STATE_ERROR;
+        if (jfwriter_pedestal()) daq_state = STATE_ERROR;
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_READY) && (command == "arm")) {
         daq_state = STATE_CHANGE;
@@ -81,15 +79,16 @@ void detector_command(const Pistache::Rest::Request &request, Pistache::Http::Re
         if (jfwriter_pedestalG0()) daq_state = STATE_ERROR;
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_READY) && (command == "pedestalG1")) {
+        daq_state = STATE_CHANGE;
         if (jfwriter_pedestalG1()) daq_state = STATE_ERROR;
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_READY) && (command == "pedestalG2")) {
+        daq_state = STATE_CHANGE;
         if (jfwriter_pedestalG2()) daq_state = STATE_ERROR;
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_READY) && (command == "pedestal")) {
-        if (jfwriter_pedestalG2()) daq_state = STATE_ERROR;
-        else if (jfwriter_pedestalG1()) daq_state = STATE_ERROR;
-        else if (jfwriter_pedestalG0()) daq_state = STATE_ERROR;
+        daq_state = STATE_CHANGE;
+        if (jfwriter_pedestal()) daq_state = STATE_ERROR;
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_ACQUIRE) && (command == "disarm")) {
         daq_state = STATE_CHANGE;
@@ -338,7 +337,6 @@ void fetch_preview_log(const Pistache::Rest::Request &request, Pistache::Http::R
 
     auto res = response.send(Pistache::Http::Code::Ok, (char *) jpeg->data(), jpeg->size(), MIME(Image, Jpeg));
     res.then([jpeg](ssize_t bytes) { delete (jpeg); }, Pistache::Async::NoExcept);
-
 }
 
 void fetch_spot(const Pistache::Rest::Request &request, Pistache::Http::ResponseWriter response) {

@@ -208,8 +208,8 @@ int close_detector() {
 #ifndef OFFLINE
         std::cout << "Stop detector" << std::endl;
         stop_detector();
-        std::cout << "Return to dynamic gain" << std::endl;
-        det->setSettings(slsDetectorDefs::detectorSettings::DYNAMICGAIN);
+        // std::cout << "Return to dynamic gain" << std::endl;
+        // det->setSettings(slsDetectorDefs::detectorSettings::DYNAMICGAIN);
 #endif
         return 0;
 }

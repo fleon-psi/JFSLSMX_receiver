@@ -185,6 +185,7 @@ int jfwriter_arm();
 int jfwriter_disarm();
 int jfwriter_setup();
 int jfwriter_close();
+int jfwriter_pedestal();
 int jfwriter_pedestalG0();
 int jfwriter_pedestalG1();
 int jfwriter_pedestalG2();

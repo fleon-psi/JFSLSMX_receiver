@@ -185,6 +185,29 @@ void count_bad_pixel() {
     }
 }
 
+int jfwriter_pedestal_all() {
+    if (jfwriter_pedestalG2()) return 1;
+    if (jfwriter_pedestalG1()) return 1;
+    if (jfwriter_pedestalG0()) return 1;
+    return 0;
+}
+
+int jfwriter_pedestal() {
+    int i = 0;
+    size_t total_bad_pixels;
+    do {
+        if (i > 0) {
+            std::cout << "Redoing pedestal" << std::endl;
+            sleep(1);
+        }
+        if (jfwriter_pedestal_all()) return 1;
+        i++;
+        total_bad_pixels = 0;
+        for (int j = 0; j < NMODULES*NCARDS; j++) total_bad_pixels += bad_pixels[j];
+    } while ((i < 10) && (total_bad_pixels > 100000));
+    return 0;
+}
+
 int jfwriter_pedestalG0() {
     sleep(1); // Added to ensure that there is enough time between pedestal measurements
     experiment_settings_t tmp_settings = experiment_settings;
