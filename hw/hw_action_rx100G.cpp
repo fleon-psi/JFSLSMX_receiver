@@ -393,7 +393,7 @@ action_RO_config_reg *Action_Config)
 #pragma HLS INTERFACE s_axilite port=din_gmem bundle=ctrl_reg offset=0x030
 
 #pragma HLS INTERFACE m_axi port=dout_gmem bundle=host_mem offset=slave depth=512 \
-		max_read_burst_length=64  max_write_burst_length=64 latency=256
+		max_read_burst_length=64  max_write_burst_length=64 latency=384
 #pragma HLS INTERFACE s_axilite port=dout_gmem bundle=ctrl_reg offset=0x040
 
 			/*  // DDR memory Interface - CAN BE COMMENTED IF UNUSED
@@ -462,16 +462,15 @@ action_RO_config_reg *Action_Config)
 			default:
 #endif
 				// TODO: High priority - need to have this reset by default at the beginning of the action
-				if (act_reg->Data.mode == MODE_RESET)
 				{
 #pragma HLS PROTOCOL fixed
 					int i = 0;
 					eth_reset = 1;
-					while (i < 32) {
+					while (i < 64) {
 						i++; ap_wait();
 					}
-					if (i == 32) eth_reset = 0;
-			} else
+					if (i == 64) eth_reset = 0;
+			}
 				process_action(din_gmem, dout_gmem, 
                                                d_hbm_p0, d_hbm_p1, d_hbm_p2, d_hbm_p3, 
                                                d_hbm_p4, d_hbm_p5, d_hbm_p6, d_hbm_p7, 
