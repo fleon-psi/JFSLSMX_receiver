@@ -13,6 +13,9 @@ class StatusBar extends Component {
      fetch('/jf/command/initialize',{method : "PUT"});
   }
 
+  pedestal() {
+      fetch('/jf/command/pedestal',{method : "PUT"});
+  }
   render() {
      return <AppBar position="sticky">
        <Toolbar>
@@ -26,6 +29,7 @@ class StatusBar extends Component {
        <Typography variant="h6" style={{flexGrow: 0.2}}>
        Expert mode
        </Typography>
+       <Button color="primary" onClick={this.pedestal} variant="contained" disableElevation>Pedestal</Button>
        <Button color="secondary" onClick={this.reinitialize} variant="contained" disableElevation>Initialize</Button>
        </Toolbar>
        </AppBar>
