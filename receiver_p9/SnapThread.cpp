@@ -96,19 +96,12 @@ void *run_snap_thread(void *in_threadarg) {
     mjob.expected_triggers  = experiment_settings.ntrigger;
     mjob.frames_per_trigger = experiment_settings.nimages_to_write_per_trigger * experiment_settings.summation;
     mjob.delay_per_trigger  = std::lround(experiment_settings.shutter_delay / experiment_settings.frame_time_detector);
+    mjob.mode               = experiment_settings.conversion_mode;
 
     mjob.in_gain_pedestal_data_addr = (uint64_t) gain_pedestal_data;
     mjob.out_frame_buffer_addr      = (uint64_t) frame_buffer;
     mjob.out_frame_status_addr      = (uint64_t) online_statistics;
     mjob.out_jf_packet_headers_addr = (uint64_t) jf_packet_headers;
-
-    // Reset is necessary to purge FIFO for ethernet interface
-    std::cout << "FPGA: Reset ethernet FIFO" << std::endl;
-    mjob.mode = MODE_RESET;
-    snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
-    rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
-    if (rc) std::cerr << "FPGA: Reset failed" << std::endl;
-
     // Launch the actual action
 
     // Call the action will:
@@ -116,11 +109,20 @@ void *run_snap_thread(void *in_threadarg) {
     //  + start the action
     //  + wait for completion
     //  + read all the registers from the action (MMIO)
-    mjob.mode = experiment_settings.conversion_mode;
+
     snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
     rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
     if (rc) std::cerr << "FPGA: Action failed" << std::endl;
-    std::cout << "FPGA: All done" << std::endl;
+
+    std::cout << "FPGA: Action done" << std::endl;
+    sleep(180);
+
+    // Reset is necessary to purge FIFO for ethernet interface
+    std::cout << "FPGA: Reset ethernet FIFO" << std::endl;
+    mjob.mode = MODE_RESET;
+    snap_job_set(&cjob, &mjob, sizeof(mjob), NULL, 0);
+    rc = snap_action_sync_execute_job(action, &cjob, TIMEOUT);
+    if (rc) std::cerr << "FPGA: Reset failed" << std::endl;
 
     pthread_exit(0);
 }
