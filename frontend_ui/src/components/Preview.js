@@ -19,7 +19,7 @@ class Preview extends Component {
   };
 
   componentDidMount() {
-    this.interval = setInterval(() => this.updateImg(), 300);
+    this.interval = setInterval(() => this.updateImg(), 1000);
   }
 
   componentWillUnmount() {
@@ -27,7 +27,7 @@ class Preview extends Component {
   }
 
   updateImg() {
-    this.setState({image: this.state.image + 1});
+    this.setState({image: (this.state.image + 1) % 256000});
   }
 
   sliderMoved = (event, newValue) => {
@@ -44,8 +44,8 @@ class Preview extends Component {
             <div style={{  maxWidth: '1030px', maxHeight: '1028px' }}>
               <PinchZoomPan maxScale={4.0}>
                 {this.state.logarithmic?
-                    <img src={"/jf/preview_log/" + this.state.contrast + "/" + this.state.image} alt="Preview"/>:
-                    <img src={"/jf/preview/" + this.state.contrast + "/" + this.state.image} alt="Preview"/>}
+                    <img src={"http://mx-jungfrau-1:5232/preview_log/" + this.state.contrast + "/" + this.state.image} alt="Preview"/>:
+                    <img src={"http://mx-jungfrau-1:5232/preview/" + this.state.contrast + "/" + this.state.image} alt="Preview"/>}
               </PinchZoomPan>
             </div>
           </Paper>
