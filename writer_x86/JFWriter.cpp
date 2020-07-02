@@ -226,7 +226,6 @@ int jfwriter_pedestalG0() {
     calc_mean_pedestal(gain_pedestal.pedeG0, mean_pedestalG0);
     count_bad_pixel();
     log_pedestal_G0();
-    sleep(1); // Just for safety
     return 0;
 }
 
@@ -247,7 +246,6 @@ int jfwriter_pedestalG1() {
     calc_mean_pedestal(gain_pedestal.pedeG1, mean_pedestalG1);
     count_bad_pixel();
     log_pedestal_G1();
-    sleep(1); // Just for safety
     return 0;
 }
 
@@ -269,7 +267,6 @@ int jfwriter_pedestalG2() {
     calc_mean_pedestal(gain_pedestal.pedeG2, mean_pedestalG2);
     count_bad_pixel();
     log_pedestal_G2();
-    sleep(1); // Just for safety
     return 0;
 }
 
