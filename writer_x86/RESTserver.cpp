@@ -30,7 +30,7 @@
 
 pthread_mutex_t daq_state_mutex = PTHREAD_MUTEX_INITIALIZER;
 enum daq_state_t {
-    STATE_READY, STATE_ACQUIRE, STATE_ERROR, STATE_CHANGE, STATE_NOT_INITIALIZED
+    STATE_READY, STATE_PEDESTAL, STATE_ACQUIRE, STATE_ERROR, STATE_CHANGE, STATE_NOT_INITIALIZED
 } daq_state;
 
 std::string state_to_string() {
@@ -39,6 +39,8 @@ std::string state_to_string() {
             return "Ready";
         case STATE_ACQUIRE:
             return "Acquiring";
+        case STATE_PEDESTAL:
+            return "Pedestal (dark current) measurement";
         case STATE_ERROR:
             return "Error";
         case STATE_CHANGE:
@@ -69,6 +71,7 @@ void detector_command(const Pistache::Rest::Request &request, Pistache::Http::Re
             jfwriter_disarm();
         daq_state = STATE_CHANGE;
         set_default_parameters();
+        daq_state = STATE_PEDESTAL;
         if (jfwriter_pedestal()) daq_state = STATE_ERROR;
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_READY) && (command == "arm")) {
@@ -76,18 +79,19 @@ void detector_command(const Pistache::Rest::Request &request, Pistache::Http::Re
         if (jfwriter_arm()) daq_state = STATE_ERROR;
         else daq_state = STATE_ACQUIRE;
     } else if ((daq_state == STATE_READY) && (command == "pedestalG0")) {
+        daq_state = STATE_PEDESTAL;
         if (jfwriter_pedestalG0()) daq_state = STATE_ERROR;
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_READY) && (command == "pedestalG1")) {
-        daq_state = STATE_CHANGE;
+        daq_state = STATE_PEDESTAL;
         if (jfwriter_pedestalG1()) daq_state = STATE_ERROR;
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_READY) && (command == "pedestalG2")) {
-        daq_state = STATE_CHANGE;
+        daq_state = STATE_PEDESTAL;
         if (jfwriter_pedestalG2()) daq_state = STATE_ERROR;
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_READY) && (command == "pedestal")) {
-        daq_state = STATE_CHANGE;
+        daq_state = STATE_PEDESTAL;
         if (jfwriter_pedestal()) daq_state = STATE_ERROR;
         else daq_state = STATE_READY;
     } else if ((daq_state == STATE_ACQUIRE) && (command == "disarm")) {
