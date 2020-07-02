@@ -254,7 +254,7 @@ void read_eth_packet(AXI_STREAM &in, DATA_STREAM &out, eth_settings_t eth_settin
 
 			// For each packet, part of JF header is saved
 			if (packet_out.save && (packet_out.eth_packet == 0)) {
-				ap_uint<28> hbm_addr = header.jf_frame_number * NMODULES + packet_out.module;
+				ap_uint<28> hbm_addr = packet_out.frame_number * NMODULES + packet_out.module;
 				ap_uint<256> save_to_memory;
 				save_to_memory(63,0)    = header.jf_frame_number;
 				save_to_memory(79,64)   = header.udp_src_port;
