@@ -477,7 +477,7 @@ int main(int argc, char **argv) {
         TCP_exchange_magic_number();
         close(accepted_socket);
 
-#define SAVE_DEBUG_INFO
+#if SAVE_DEBUG_INFO
         // Save pedestal
         save_pedestal(receiver_settings.pedestal_file_name);
 
