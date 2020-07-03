@@ -457,6 +457,8 @@ int main(int argc, char **argv) {
         else
             std::cout << "Frames collected " << ((double)(online_statistics->good_packets / NMODULES / 128)) / (double) experiment_settings.nframes_to_collect * 100.0 << "%" << std::endl;
 
+        std::cout << "First frame collected/written - frame number: " << jf_packet_headers[0].jf_frame_number << " Timestamp " << jf_packet_headers[0].jf_timestamp << std::endl;
+        std::cout << "Second frame collected/written - frame number: " << jf_packet_headers[1].jf_frame_number << " Timestamp " << jf_packet_headers[1].jf_timestamp << std::endl;
         // Send header data and collection statistics
         send(accepted_socket, online_statistics, sizeof(online_statistics_t), 0);
         // Send gain, pedestal and pixel mask
@@ -475,6 +477,27 @@ int main(int argc, char **argv) {
         TCP_exchange_magic_number();
         close(accepted_socket);
 
+#define SAVE_DEBUG_INFO
+        // Save pedestal
+        save_pedestal(receiver_settings.pedestal_file_name);
+
+        // Save frame buffer
+        std::ofstream ofile1("output_data" + std::to_string(receiver_settings.card_number) + ".dat", std::ios::binary | std::ios::out);
+        ofile1.write((char *) frame_buffer, frame_buffer_size);
+        ofile1.close();
+
+        //Save packet headers
+        std::ofstream ofile2("packet_headers" + std::to_string(receiver_settings.card_number) + ".dat", std::ios::binary | std::ios::out);
+        ofile2.write((char *) jf_packet_headers, jf_packet_headers_size);
+        ofile2.close();
+
+        //Save status info
+        std::ofstream ofile3("status_buffer" + std::to_string(receiver_settings.card_number) + ".dat", std::ios::binary | std::ios::out);
+        ofile3.write((char *) status_buffer, status_buffer_size);
+        ofile3.close();
+
+        std::cout << "Debug information saved" << std::endl;
+#endif
         // Reset status buffer
         memset(status_buffer, 0x0, status_buffer_size);
     }
