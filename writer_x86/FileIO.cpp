@@ -67,8 +67,8 @@ int addStringAttribute(hid_t location, std::string const& name, std::string cons
     /* https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_attribute.c */
     hid_t aid = H5Screate(H5S_SCALAR);
     hid_t atype = H5Tcopy(H5T_C_S1);
-    H5Tset_size(atype, val.length()+1);
-    H5Tset_strpad(atype,H5T_STR_NULLTERM);
+    H5Tset_size(atype, H5T_VARIABLE);
+    H5Tset_strpad(atype, H5T_STR_NULLTERM);
     hid_t attr = H5Acreate2(location, name.c_str(), atype, aid, H5P_DEFAULT, H5P_DEFAULT);
     herr_t ret = H5Awrite(attr, atype, val.c_str());
     ret = H5Sclose(aid);
@@ -340,8 +340,8 @@ int saveString(hid_t location, std::string const& name, std::string const& val, 
     hid_t dataspace_id = H5Screate(H5S_SCALAR);
 
     hid_t atype = H5Tcopy(H5T_C_S1);
-    H5Tset_size(atype, 1024);
-    H5Tset_strpad(atype,H5T_STR_NULLTERM);
+    H5Tset_size(atype, H5T_VARIABLE);
+    H5Tset_strpad(atype, H5T_STR_NULLTERM);
 
     /* Create the dataset. */
     hid_t dataset_id = H5Dcreate2(location, name.c_str(), atype, dataspace_id,
