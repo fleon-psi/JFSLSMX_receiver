@@ -123,20 +123,26 @@ int trigger_rpi() {
 
 
 bool is_detector_idle() {
+#ifndef OFFLINE
+
     auto result = det->getDetectorStatus();
-    if (!result.equal()) return false;
+    if (!result.equal()) return false; // TODO: idle and stopped can be mixed
     auto val = result.squash(slsDetectorDefs::runStatus::ERROR);
-    if ((val == slsDetectorDefs::runStatus::IDLE) ||
-    (val == slsDetectorDefs::runStatus::STOPPED) ||
-    (val == slsDetectorDefs::runStatus::RUN_FINISHED)) return true;
-    else return false;
+    return (val == slsDetectorDefs::runStatus::IDLE) ||
+           (val == slsDetectorDefs::runStatus::STOPPED) ||
+           (val == slsDetectorDefs::runStatus::RUN_FINISHED);
+#else
+    return true;
+#endif
 }
 
 void stop_detector() {
+#ifndef OFFLINE
     if (!is_detector_idle()) {
         det->stopDetector();
         while (!is_detector_idle()) usleep(10000);
     }
+#endif
 }
 
 int setup_detector() {
