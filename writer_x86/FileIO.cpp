@@ -66,13 +66,15 @@ int make_dir(std::string const& path) {
 int addStringAttribute(hid_t location, std::string const& name, std::string const& val) {
     /* https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_attribute.c */
     hid_t aid = H5Screate(H5S_SCALAR);
-    hid_t atype = H5Tcopy(H5T_C_S1);
-    H5Tset_size(atype, H5T_VARIABLE);
-    H5Tset_strpad(atype, H5T_STR_NULLTERM);
-    hid_t attr = H5Acreate2(location, name.c_str(), atype, aid, H5P_DEFAULT, H5P_DEFAULT);
-    herr_t ret = H5Awrite(attr, atype, val.c_str());
+    hid_t str_type = H5Tcopy(H5T_C_S1);
+    H5Tset_size(str_type, H5T_VARIABLE);
+
+    hid_t attr = H5Acreate2(location, name.c_str(), str_type, aid, H5P_DEFAULT, H5P_DEFAULT);
+    const char *s = val.c_str();
+    herr_t ret = H5Awrite(attr, str_type, &s);
+
     ret = H5Sclose(aid);
-    ret = H5Tclose(atype);
+    ret = H5Tclose(str_type);
     ret = H5Aclose(attr);
 
     return 0;
@@ -98,7 +100,7 @@ int addDoubleAttribute(hid_t location, std::string const& name, const double *va
 
 hid_t createGroup(hid_t master_file_id, std::string const& group, std::string const& nxattr) {
     hid_t group_id = H5Gcreate(master_file_id, group.c_str(), H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
-    if (nxattr != "") addStringAttribute(group_id, "NX_class", nxattr);
+    if (!nxattr.empty()) addStringAttribute(group_id, "NX_class", nxattr);
     return group_id;
 }
 
@@ -147,27 +149,32 @@ int saveUInt16_3D(hid_t location, std::string const& name, const uint16_t *val, 
     return 0;
 }
 
-int saveString1D(hid_t location, std::string const& name, char *val, std::string const& units, int dim, int len) {
+int saveString1D(hid_t location, std::string const& name, std::vector<std::string> vals, std::string const& units) {
     herr_t status;
 
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
     hsize_t dims[1];
-    dims[0] = dim;
+    dims[0] = vals.size();
 
     /* Create the data space for the dataset. */
     hid_t dataspace_id = H5Screate_simple(1, dims, NULL);
 
     hid_t atype = H5Tcopy(H5T_C_S1);
-    H5Tset_size(atype, len);
+    H5Tset_size(atype, H5T_VARIABLE);
     H5Tset_strpad(atype,H5T_STR_NULLTERM);
     /* Create the dataset. */
     hid_t dataset_id = H5Dcreate2(location, name.c_str(), atype, dataspace_id,
                                   H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
+    const char *s[vals.size()];
+    for (int i = 0; i < vals.size(); i++)
+        s[i] = vals[i].c_str();
+
     /* Write the dataset. */
     status = H5Dwrite(dataset_id, atype, H5S_ALL, H5S_ALL, H5P_DEFAULT,
-                      val);
-    if (units != "") addStringAttribute(dataset_id, "units", units);
+                      s);
+
+    if (!units.empty()) addStringAttribute(dataset_id, "units", units);
 
     /* End access to the dataset and release resources used by it. */
     status = H5Dclose(dataset_id);
@@ -196,7 +203,7 @@ int saveDouble1D(hid_t location, std::string const& name, const double *val, std
     status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,
                       val);
 
-    if (units != "") addStringAttribute(dataset_id, "units", units);
+    if (!units.empty()) addStringAttribute(dataset_id, "units", units);
 
     /* End access to the dataset and release resources used by it. */
     status = H5Dclose(dataset_id);
@@ -226,7 +233,7 @@ int saveDouble2D(hid_t location, std::string const& name, const double *val, std
     status = H5Dwrite(dataset_id, H5T_NATIVE_DOUBLE, H5S_ALL, H5S_ALL, H5P_DEFAULT,
                       val);
 
-    if (units != "") addStringAttribute(dataset_id, "units", units);
+    if (!units.empty()) addStringAttribute(dataset_id, "units", units);
 
     /* End access to the dataset and release resources used by it. */
     status = H5Dclose(dataset_id);
@@ -256,7 +263,7 @@ int saveUInt2D(hid_t location, std::string const& name, const uint32_t *val, std
     status = H5Dwrite(dataset_id, H5T_NATIVE_UINT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
                       val);
 
-    if (units != "") addStringAttribute(dataset_id, "units", units);
+    if (!units.empty()) addStringAttribute(dataset_id, "units", units);
 
     // Write dataset to disk
     status = H5Dflush(dataset_id);
@@ -269,7 +276,7 @@ int saveUInt2D(hid_t location, std::string const& name, const uint32_t *val, std
     return 0;
 }
 
-int saveUInt16_as_32_2D(hid_t location, std::string name, const uint16_t *val, std::string units, int dim1, int dim2) {
+int saveUInt16_as_32_2D(hid_t location, std::string const& name, const uint16_t *val, std::string const& units, int dim1, int dim2) {
     herr_t status;
 
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
@@ -288,7 +295,7 @@ int saveUInt16_as_32_2D(hid_t location, std::string name, const uint16_t *val, s
     status = H5Dwrite(dataset_id, H5T_STD_U16LE, H5S_ALL, H5S_ALL, H5P_DEFAULT,
                       val);
 
-    if (units != "") addStringAttribute(dataset_id, "units", units);
+    if (!units.empty()) addStringAttribute(dataset_id, "units", units);
 
     /* End access to the dataset and release resources used by it. */
     status = H5Dclose(dataset_id);
@@ -317,7 +324,7 @@ int saveInt1D(hid_t location, std::string const& name, const int *val, std::stri
     status = H5Dwrite(dataset_id, H5T_NATIVE_INT, H5S_ALL, H5S_ALL, H5P_DEFAULT,
                       val);
 
-    if (units != "") addStringAttribute(dataset_id, "units", units);
+    if (!units.empty()) addStringAttribute(dataset_id, "units", units);
 
     /* End access to the dataset and release resources used by it. */
     status = H5Dclose(dataset_id);
@@ -329,7 +336,6 @@ int saveInt1D(hid_t location, std::string const& name, const int *val, std::stri
 }
 
 int saveString(hid_t location, std::string const& name, std::string const& val, std::string const& units = "", std::string const& short_name = "") {
-    std::cout << name << " " << val << std::endl;
     herr_t status;
 
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
@@ -339,24 +345,24 @@ int saveString(hid_t location, std::string const& name, std::string const& val, 
     /* Create the data space for the dataset. */
     hid_t dataspace_id = H5Screate(H5S_SCALAR);
 
-    hid_t atype = H5Tcopy(H5T_C_S1);
-    H5Tset_size(atype, H5T_VARIABLE);
-    H5Tset_strpad(atype, H5T_STR_NULLTERM);
+    hid_t str_type = H5Tcopy(H5T_C_S1);
+    H5Tset_size(str_type, H5T_VARIABLE);
 
     /* Create the dataset. */
-    hid_t dataset_id = H5Dcreate2(location, name.c_str(), atype, dataspace_id,
+    hid_t dataset_id = H5Dcreate2(location, name.c_str(), str_type, dataspace_id,
                                   H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
+    const char *s = val.c_str();
     /* Write the dataset. */
-    status = H5Dwrite(dataset_id, atype, H5S_ALL, H5S_ALL, H5P_DEFAULT,
-                      val.c_str());
+    status = H5Dwrite(dataset_id, str_type, H5S_ALL, H5S_ALL, H5P_DEFAULT,
+                      &s);
 
-    if (units != "") addStringAttribute(dataset_id, "units", units);
-    if (short_name != "") addStringAttribute(dataset_id, "short_name", short_name);
+    if (!units.empty()) addStringAttribute(dataset_id, "units", units);
+    if (!short_name.empty()) addStringAttribute(dataset_id, "short_name", short_name);
 
     /* End access to the dataset and release resources used by it. */
     status = H5Dclose(dataset_id);
-    status = H5Tclose(atype);
+    status = H5Tclose(str_type);
     status = H5Sclose(dataspace_id);
     return 0;
 }
@@ -377,11 +383,6 @@ std::string hdf5_version() {
     H5get_libversion(&majnum, &minnum, &relnum);
     return "hdf5-" + std::to_string(majnum) + "." + std::to_string(minnum) + "." + std::to_string(relnum);
 }
-
-//int saveTimeUTC(hid_t location, std::string name, time_t time) {
-//    return saveString(location, name, std::string(buf));
-//}
-
 
 int saveDouble(hid_t location, std::string const& name, double val, std::string const& units = "") {
     double tmp = val;
@@ -608,20 +609,17 @@ int write_detector_parameters() {
 int write_detector_group() {
     hid_t grp = createGroup(master_file_id, "/entry/instrument/" DETECTOR_NAME,"NXdetector_group");
 
-    char *group_names = (char *) malloc(24 *sizeof(char *));
-    strcpy(group_names, DETECTOR_NAME);
-    strcpy(group_names+16,"detector");
+    std::vector<std::string> group_names = {DETECTOR_NAME, "detector"};
 
     int32_t group_index[2] = {1,2};
     int32_t group_parent[2] = {-1, 1};
     int32_t group_type[2] = {1, 2};
 
-    saveString1D(grp,"group_names", group_names, "", 2, 16);
+    saveString1D(grp,"group_names", group_names, "");
     saveInt1D(grp, "group_parent", group_parent, "", 2);
     saveInt1D(grp, "group_index", group_index, "", 2);
     saveInt1D(grp, "group_type", group_type, "", 2);
     H5Gclose(grp);
-    free(group_names);
 
     return 0;
 }
@@ -826,7 +824,7 @@ int close_master_hdf5() {
 
 int open_data_hdf5() {
     // Calculate number of frames
-    int32_t frames = experiment_settings.nimages_to_write;
+    hsize_t images = experiment_settings.nimages_to_write;
 
     std::string filename = "";
     if (writer_settings.default_path != "") filename =
@@ -864,7 +862,7 @@ int open_data_hdf5() {
         dim1 = 512 * NMODULES; dim2 = 1024;
     }
 
-    hsize_t dims[] = {frames, dim1*NCARDS, dim2};
+    hsize_t dims[] = {images, dim1*NCARDS, dim2};
     hsize_t maxdims[] = {H5S_UNLIMITED, dim1*NCARDS, dim2};
     hsize_t chunk[] = {1, dim1, dim2};
 
@@ -908,7 +906,7 @@ int open_data_hdf5() {
     h5ret = H5Sclose(aid);
     h5ret = H5Aclose(attr);
 
-    tmp = frames;
+    tmp = images;
     aid = H5Screate(H5S_SCALAR);
     attr = H5Acreate2(data_hdf5_dataset, "image_nr_high", H5T_STD_I32LE, aid, H5P_DEFAULT, H5P_DEFAULT);
     h5ret = H5Awrite(attr, H5T_NATIVE_INT, &tmp);
