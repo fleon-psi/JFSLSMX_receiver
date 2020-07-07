@@ -41,13 +41,13 @@ hid_t data_hdf5_dataspace;
 pthread_mutex_t hdf5_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 inline std::string only_file_name(std::string const& path) {
-    int pos = path.rfind("/");
+    int pos = path.rfind('/');
     if (pos != std::string::npos) return path.substr(pos+1);
     else return path;
 }
 
 int make_dir(std::string const& path) {
-    int pos = path.rfind("/");
+    int pos = path.rfind('/');
     if (pos != std::string::npos) {
         std::string directory = path.substr(0,pos);
         make_dir(directory); // For directories upstream, errors are ignored.
@@ -105,7 +105,7 @@ hid_t createGroup(hid_t master_file_id, std::string const& group, std::string co
 }
 
 // +Compress
-int saveUInt16_3D(hid_t location, std::string const& name, const uint16_t *val, int dim1, int dim2, int dim3, double multiplier) {
+int saveUInt16_3D(hid_t location, std::string const& name, const uint16_t *val, hsize_t dim1, hsize_t dim2, hsize_t dim3, double multiplier) {
     herr_t status;
 
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
@@ -161,7 +161,7 @@ int saveString1D(hid_t location, std::string const& name, std::vector<std::strin
 
     hid_t atype = H5Tcopy(H5T_C_S1);
     H5Tset_size(atype, H5T_VARIABLE);
-    H5Tset_strpad(atype,H5T_STR_NULLTERM);
+
     /* Create the dataset. */
     hid_t dataset_id = H5Dcreate2(location, name.c_str(), atype, dataspace_id,
                                   H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
@@ -394,7 +394,7 @@ int saveInt(hid_t location, std::string const& name, int val, std::string const&
     return saveInt1D(location, name, &tmp, units, 1);
 }
 
-int SaveAngleContainer(hid_t location, std::string name, double start, double increment, std::string units) {
+int SaveAngleContainer(hid_t location, std::string const& name, double start, double increment, std::string units) {
     size_t nimages = experiment_settings.nimages_to_write;
     double val[nimages];
     for (int i = 0; i < nimages; i++) {
@@ -442,18 +442,21 @@ void write_metrology() {
     double moduleOrigin[NMODULES*NCARDS][3];
     double detectorCenter[3] = {0.0, 0.0, 0.0};
 
+    double size_pxl_x = 2 * 1030 + VERTICAL_GAP_PIXELS;
+    double size_pxl_y = (NMODULES * NCARDS / 2) * 514 + (NMODULES * NCARDS / 2 - 1) * HORIZONTAL_GAP_PIXELS;
+
     for (int i = 0; i < NMODULES*NCARDS; i ++) {
         double corner_x = (i%2) * (1030 + VERTICAL_GAP_PIXELS); // +GAP
         double corner_y = (i/2) * (514 + HORIZONTAL_GAP_PIXELS); // +GAP
         // 1. Find module corner in lab coordinates, based on pixel coordinates
-        moduleOrigin[i][0] = (corner_x - experiment_settings.beam_x) * PIXEL_SIZE_IN_MM;
-        moduleOrigin[i][1] = (corner_y - experiment_settings.beam_y) * PIXEL_SIZE_IN_MM;
+        moduleOrigin[i][0] = ((size_pxl_x - corner_x) - (size_pxl_x - experiment_settings.beam_x)) * PIXEL_SIZE_IN_MM;
+        moduleOrigin[i][1] = ((size_pxl_y - corner_y) - (size_pxl_y - experiment_settings.beam_y)) * PIXEL_SIZE_IN_MM;
         moduleOrigin[i][2] = 0.0; // No Z offset for modules at the moment
 
         // 2. Calculate vector from module in mm
         double moduleCenter[3];
-        moduleCenter[0] = moduleOrigin[i][0] + PIXEL_SIZE_IN_MM * 1030.0 / 2.0;
-        moduleCenter[1] = moduleOrigin[i][1] + PIXEL_SIZE_IN_MM * 514.0 / 2.0;
+        moduleCenter[0] = moduleOrigin[i][0] - PIXEL_SIZE_IN_MM * 1030.0 / 2.0;
+        moduleCenter[1] = moduleOrigin[i][1] - PIXEL_SIZE_IN_MM * 514.0 / 2.0;
         moduleCenter[2] = moduleOrigin[i][2];
 
         // 3. Find detector center
@@ -531,7 +534,7 @@ void write_metrology() {
         addStringAttribute(dataset, "depends_on","/entry/instrument/" DETECTOR_NAME "/transformations/AXIS_D0M" + std::to_string(i));
         addDoubleAttribute(dataset, "offset", offset_fast, 3);
 
-        double vector_fast[3] = {1,0,0};
+        double vector_fast[3] = {-1,0,0};
         addDoubleAttribute(dataset, "vector", vector_fast, 3);
 
         H5Dclose(dataset);
@@ -544,7 +547,7 @@ void write_metrology() {
         addStringAttribute(dataset, "transformation_type","translation");
         addStringAttribute(dataset, "depends_on","/entry/instrument/" DETECTOR_NAME "/transformations/AXIS_D0M" + std::to_string(i));
         addDoubleAttribute(dataset, "offset", offset_slow, 3);
-        double vector_slow[3] = {0,1,0};
+        double vector_slow[3] = {0,-1,0};
         addDoubleAttribute(dataset, "vector", vector_slow, 3);
 
         H5Dclose(dataset);
@@ -725,8 +728,8 @@ int write_spots() {
 }
 
 int open_master_hdf5() {
-    std::string filename = "";
-    if (writer_settings.default_path != "") {
+    std::string filename;
+    if (!writer_settings.default_path.empty()) {
         filename =
                 writer_settings.default_path + "/" +
                 writer_settings.HDF5_prefix + "_master.h5";
@@ -826,8 +829,8 @@ int open_data_hdf5() {
     // Calculate number of frames
     hsize_t images = experiment_settings.nimages_to_write;
 
-    std::string filename = "";
-    if (writer_settings.default_path != "") filename =
+    std::string filename;
+    if (!writer_settings.default_path.empty()) filename =
                                                     writer_settings.default_path + "/" +
                                                     writer_settings.HDF5_prefix + "_data.h5";
     else filename = writer_settings.HDF5_prefix + "_data.h5";
@@ -888,6 +891,8 @@ int open_data_hdf5() {
             HDF5_ERROR(h5ret,H5Pset_filter);
             break;
         }
+        case JF_COMPRESSION_NONE:
+            break;
     }
     // Create the dataset.
     if (experiment_settings.pixel_depth == 2)
@@ -953,8 +958,8 @@ int save_data_hdf(char *data, size_t size, size_t frame, int chunk) {
 int save_binary(char *data, size_t size, int frame_id, int thread_id) {
     char buff[12];
     snprintf(buff,12,"%08d_%01d", frame_id, thread_id);
-    std::string prefix = "";
-    if (writer_settings.default_path != "")
+    std::string prefix;
+    if (!writer_settings.default_path.empty())
         prefix = writer_settings.default_path + "/";
     std::string filename = prefix + writer_settings.HDF5_prefix+"_"+std::string(buff) + ".img";
     std::ofstream out_file(filename.c_str(), std::ios::binary | std::ios::out);
