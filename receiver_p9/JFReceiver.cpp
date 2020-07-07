@@ -312,10 +312,19 @@ int main(int argc, char **argv) {
 
     // Load test data
 #ifdef RECEIVE_FROM_FILE
-    std::ifstream ifile("output_data.dat", std::ios::binary | std::ios::in);
-        ifile.read((char *) frame_buffer, NPIXEL * sizeof(uint16_t) * FRAME_BUF_SIZE);
-        ifile.close();
+    std::ifstream ifile1("output_data" + std::to_string(receiver_settings.card_number) + ".dat", std::ios::binary | std::ios::in);
+    ifile1.read((char *) frame_buffer, frame_buffer_size);
+    ifile1.close();
+
+    std::ifstream ifile2("packet_headers" + std::to_string(receiver_settings.card_number) + ".dat", std::ios::binary | std::ios::in);
+    ifile2.read((char *) jf_packet_headers, jf_packet_headers_size);
+    ifile2.close();
+
+    std::ifstream ifile3("status_buffer" + std::to_string(receiver_settings.card_number) + ".dat", std::ios::binary | std::ios::in);
+    ifile3.read((char *) status_buffer, status_buffer_size);
+    ifile3.close();
 #endif
+
     // Establish RDMA link
     if (setup_ibverbs(ib_settings, receiver_settings.ib_dev_name.c_str(), RDMA_SQ_SIZE, 0) == 1) exit(EXIT_FAILURE);
     std::cout << "IB link ready" << std::endl;
@@ -472,11 +481,6 @@ int main(int argc, char **argv) {
         switch_to_reset(ib_settings);
         switch_to_init(ib_settings);
 
-        // Barrier
-        // Check magic number again
-        TCP_exchange_magic_number();
-        close(accepted_socket);
-
 #if SAVE_DEBUG_INFO
         // Save pedestal
         save_pedestal(receiver_settings.pedestal_file_name);
@@ -498,6 +502,12 @@ int main(int argc, char **argv) {
 
         std::cout << "Debug information saved" << std::endl;
 #endif
+
+        // Barrier
+        // Check magic number again
+        TCP_exchange_magic_number();
+        close(accepted_socket);
+
         // Reset status buffer
         memset(status_buffer, 0x0, status_buffer_size);
     }
