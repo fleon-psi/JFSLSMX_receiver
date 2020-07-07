@@ -250,11 +250,7 @@ int TCP_exchange_magic_number() {
     // Receive parameters
     read(accepted_socket, &magic_number, sizeof(uint64_t));
 
-    if (magic_number != TCPIP_CONN_MAGIC_NUMBER) {
-        std::cerr << "Mismatch in TCP/IP communication" << std::endl;
-        return 1;
-    }
-    return 0;
+    return (magic_number != TCPIP_CONN_MAGIC_NUMBER);
 }
 
 int TCP_accept_connection() {
@@ -348,8 +344,7 @@ int main(int argc, char **argv) {
 #endif
     while (1) {
         // Accept TCP/IP communication
-        while (TCP_accept_connection() != 0)
-            std::cout << "Bogus TCP/IP connection" << std::endl;
+        while (TCP_accept_connection() != 0);
 
         // Receive experimental settings via TCP/IP
         TCP_receive(accepted_socket, (char *) &experiment_settings, sizeof(experiment_settings_t));
