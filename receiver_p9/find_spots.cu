@@ -73,7 +73,7 @@ __global__ void find_spots_colspot(T *in, strong_pixel *out, float strong, int N
         for (int16_t line = NBY; line < LINES - NBY; line++) {
 
             // sum and sum of squares for (2*NBX+1) x (2*NBY+1) elements
-            int64_t sum  = sum_vert[0];
+            int64_t sum  = sum_vert[0]; // Should be divided (float)((2*NBX+1) * (2*NBY+1));
             int64_t sum2 = sum2_vert[0];
 
             for (int i = 1; i < 2*NBX+1; i ++) {
@@ -82,18 +82,14 @@ __global__ void find_spots_colspot(T *in, strong_pixel *out, float strong, int N
             }
 
             for (int16_t col = NBX; col < COLS - NBX; col++) {
-
                 // At all cost division and sqrt must be avoided
                 // as performance penalty is significant (2x drop)
                 // instead, constants ((2*NBX+1) * (2*NBY+1)) and ((2*NBX+1) * (2*NBY+1)-1)
                 // are included in the threshold
-                float var = (2*NBX+1) * (2*NBY+1) * sum2 - (sum * sum); // This should be divided by (float) ((2*NBX+1) * (2*NBY+1)-1)
+                int64_t var = (2*NBX+1) * (2*NBY+1) * sum2 - (sum * sum); // This should be divided by ((2*NBX+1) * (2*NBY+1)-1)*((2*NBX+1) * (2*NBY+1))
+                int64_t in_minus_mean = in[(line0 + line)*COLS+col] * ((2*NBX+1) * (2*NBY+1)) - sum; // Should be divided by ((2*NBX+1) * (2*NBY+1));
 
-                float mean = sum; // Should be divided (float)((2*NBX+1) * (2*NBY+1));
-                float in_minus_mean = in[(line0 + line)*COLS+col] * ((2*NBX+1) * (2*NBY+1)) - sum; // Should be divided (float)((2*NBX+1) * (2*NBY+1));
-
-                if ((in_minus_mean > 0.0f) && // pixel value is larger than mean
-                    (sum > 0) &&          // mean is larger than zero (no bad pixels)
+                if ((in_minus_mean > (2*NBX+1) * (2*NBY+1)) && // pixel value is larger than mean
                     (in[(line0 + line)*COLS+col] > 0) && // pixel is not bad pixel and is above 0
                     (in_minus_mean * in_minus_mean > var * threshold)) {
                        // Save line, column and photon count in output table
