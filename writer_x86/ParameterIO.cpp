@@ -195,10 +195,10 @@ std::map<std::string, parameter_t> detector_options = {
                                "Strong pixel parameter for spot finding"
                        }},
         {"spot_finding_dmin",{"A", PARAMETER_FLOAT, 0.0, 20.0, false,
-                                             [](nlohmann::json &out) { out = experiment_settings.spot_finding_resolution_limit; },
-                                             [](nlohmann::json &in) {  experiment_settings.spot_finding_resolution_limit = in.get<double>(); },
-                                             "High resolution limit for spot finding"
-                                     }},
+                               [](nlohmann::json &out) { out = experiment_settings.spot_finding_resolution_limit; },
+                               [](nlohmann::json &in) {  experiment_settings.spot_finding_resolution_limit = in.get<double>(); },
+                               "High resolution limit for spot finding"
+                       }},
         {"spot_finding_max_depth",{"", PARAMETER_UINT, 1.0, NIMAGES_PER_STREAM, false,
                                [](nlohmann::json &out) { out = experiment_settings.max_spot_depth; },
                                [](nlohmann::json &in) {  experiment_settings.max_spot_depth = in.get<uint16_t>(); },
@@ -290,20 +290,26 @@ std::map<std::string, parameter_t> detector_options = {
                                "Number of bad pixels (per module)"
                        }},
         {"resolution_limit_edges", {"", PARAMETER_FLOAT, 0.0, 0.0, true,
-                               [](nlohmann::json &out) { 
+                               [](nlohmann::json &out) {
                                    out = {get_resolution_left(), get_resolution_right(), get_resolution_top(), get_resolution_bottom()};
                                },
                                [](nlohmann::json &in) { throw read_only_exception(); },
                                "Resolution limit on 4 edges of the detector"
                        }},
         {"resolution_limit_edge", {"", PARAMETER_FLOAT, 0.0, 0.0, true,
-                               [](nlohmann::json &out) { 
+                               [](nlohmann::json &out) {
                                    out = std::max(std::max(get_resolution_left(), get_resolution_right()),
                                                   std::max(get_resolution_top(), get_resolution_bottom()));
                                },
                                [](nlohmann::json &in) { throw read_only_exception(); },
                                "Resolution limit on 4 edges of the detector"
+                       }},
+        {"preview_image_number", {"", PARAMETER_UINT,0.0,0.0, true,
+                               [](nlohmann::json &out) { out = newest_preview_image();},
+                               [](nlohmann::json &in) { throw read_only_exception(); },
+                               "Highest number of image with usefule preview"
                        }}
+
 };
 
 // Set initial parameters
@@ -321,7 +327,7 @@ void set_default_parameters() {
     experiment_settings.pedestalG1_frames = 1000;
     experiment_settings.pedestalG2_frames = 1000;
     experiment_settings.conversion_mode = MODE_CONV;
-    experiment_settings.enable_spot_finding = true;
+    experiment_settings.enable_spot_finding = false;
     experiment_settings.connect_spots_between_frames = true;
     experiment_settings.strong_pixel = 5.0;
     experiment_settings.min_pixels_per_spot = 3.0;
