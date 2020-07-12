@@ -673,7 +673,7 @@ int write_sample_parameters() {
 int write_data_files_links() {
     hid_t grp = createGroup(master_file_id, "/entry/data","NXdata");
     addStringAttribute(grp, "signal", "data");
-    std::string path = writer_settings.HDF5_prefix + "_data.h5";
+    std::string path = writer_settings.HDF5_prefix + "_data_000001.h5";
     std::string remote = "/entry/data/data";
     std::string local = "data_000001";
     herr_t h5ret = H5Lcreate_external(only_file_name(path).c_str(), remote.c_str(), grp, local.c_str(), H5P_DEFAULT, H5P_DEFAULT);
@@ -757,7 +757,7 @@ int open_master_hdf5() {
     time_t now;
     time(&now);
     addStringAttribute(master_file_id, "HDF5_Version", hdf5_version());
-    addStringAttribute(master_file_id, "file_name", filename.c_str());
+    addStringAttribute(master_file_id, "file_name", filename);
     addStringAttribute(master_file_id, "file_time", time_UTC(now));
 
     hid_t grp = createGroup(master_file_id, "/entry", "NXentry");
@@ -832,8 +832,8 @@ int open_data_hdf5() {
     std::string filename;
     if (!writer_settings.default_path.empty()) filename =
                                                     writer_settings.default_path + "/" +
-                                                    writer_settings.HDF5_prefix + "_data.h5";
-    else filename = writer_settings.HDF5_prefix + "_data.h5";
+                                                    writer_settings.HDF5_prefix + "_data_000001.h5";
+    else filename = writer_settings.HDF5_prefix + "_data_000001.h5";
 
     // Need to ensure that only newest library can write into this file
     data_hdf5_fapl = H5Pcreate(H5P_FILE_ACCESS);
