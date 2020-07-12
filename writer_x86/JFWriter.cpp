@@ -54,6 +54,11 @@ int jfwriter_setup() {
 
     init_influxdb_client();
 
+    // Initialize preview image
+    preview = (int32_t *) malloc(MAX_PREVIEW * PREVIEW_SIZE * sizeof(int32_t));
+    if (preview == NULL) return 1;
+    for (int i = 0 ; i < NCARDS*MAX_PREVIEW; i++)  preview_image_available[i] = false;
+
     return 0;
 }
 
@@ -332,6 +337,9 @@ int jfwriter_arm() {
     // This is explicitly to avoid writing master HDF5 file for pedestal
     if (writer_settings.HDF5_prefix != "")
         if (open_master_hdf5()) return 1;
+
+    // Reset preview counters
+    for (int i = 0 ; i < NCARDS*MAX_PREVIEW; i++)  preview_image_available[i] = false;
 
     return jfwriter_start();
 }

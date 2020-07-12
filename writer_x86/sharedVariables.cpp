@@ -49,8 +49,9 @@ struct timespec time_pedestalG2 = {0, 0};
 struct timespec time_start = {0, 0};
 struct timespec time_end = {0, 0};
 
-std::vector<int32_t> preview(PREVIEW_SIZE);
-// pthread_mutex_t preview_mutex = PTHREAD_MUTEX_INITIALIZER;
+int32_t *preview;
+std::vector<bool> preview_image_available(MAX_PREVIEW*NCARDS);
+
 
 std::vector<spot_t> spots;
 pthread_mutex_t spots_mutex = PTHREAD_MUTEX_INITIALIZER;

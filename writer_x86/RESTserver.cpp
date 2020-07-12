@@ -323,22 +323,29 @@ void detector_state(const Pistache::Rest::Request &request, Pistache::Http::Resp
 
 void fetch_preview(const Pistache::Rest::Request &request, Pistache::Http::ResponseWriter response) {
     response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
+
+    auto query = request.query();
+
+    bool log = false;
+    size_t image_number = 0;
+    float contrast = 10;
+
+    if (query.has("log"))
+        log = true;
+
+    if (query.has("image"))
+        image_number = std::stoul(query.get("image").get());
+
+    if (query.has("contrast"))
+        contrast = std::stof(query.get("contrast").get());
+
     auto variable = request.param(":variable").as<double>();
 
-    std::vector<uint8_t> *jpeg = new std::vector<uint8_t>;
-    update_jpeg_preview(*jpeg, variable);
-
-    auto res = response.send(Pistache::Http::Code::Ok, (char *) jpeg->data(), jpeg->size(), MIME(Image, Jpeg));
-    res.then([jpeg](ssize_t bytes) { delete (jpeg); }, Pistache::Async::NoExcept);
-}
-
-void fetch_preview_log(const Pistache::Rest::Request &request, Pistache::Http::ResponseWriter response) {
-    response.headers().add<Pistache::Http::Header::AccessControlAllowOrigin>("*");
-    auto variable = request.param(":variable").as<double>();
-
-    std::vector<uint8_t> *jpeg = new std::vector<uint8_t>;
-    update_jpeg_preview_log(*jpeg, variable);
-
+    auto *jpeg = new std::vector<uint8_t>;
+    if (log)
+        update_jpeg_preview_log(*jpeg, image_number, contrast);
+    else
+        update_jpeg_preview(*jpeg, image_number, contrast);
     auto res = response.send(Pistache::Http::Code::Ok, (char *) jpeg->data(), jpeg->size(), MIME(Image, Jpeg));
     res.then([jpeg](ssize_t bytes) { delete (jpeg); }, Pistache::Async::NoExcept);
 }
@@ -454,13 +461,9 @@ int main() {
     Pistache::Rest::Routes::Get(router, "/stream/api/" API_VERSION "/status/state",
                                 Pistache::Rest::Routes::bind(&detector_state));
 
-    Pistache::Rest::Routes::Get(router, "/preview/:variable", Pistache::Rest::Routes::bind(&fetch_preview));
-    Pistache::Rest::Routes::Get(router, "/preview_log/:variable", Pistache::Rest::Routes::bind(&fetch_preview_log));
-
     // To reload via browser, something has to change in the address
     // So dummy variable x is added - it is not read, nor parsed, so JS can change it at regular intervals
-    Pistache::Rest::Routes::Get(router, "/preview/:variable/:x", Pistache::Rest::Routes::bind(&fetch_preview));
-    Pistache::Rest::Routes::Get(router, "/preview_log/:variable/:x", Pistache::Rest::Routes::bind(&fetch_preview_log));
+    Pistache::Rest::Routes::Get(router, "/preview", Pistache::Rest::Routes::bind(&fetch_preview));
 
     Pistache::Rest::Routes::Get(router, "/spot/:variable", Pistache::Rest::Routes::bind(&fetch_spot));
     Pistache::Rest::Routes::Get(router, "/SPOT.XDS", Pistache::Rest::Routes::bind(&fetch_spot_xds));

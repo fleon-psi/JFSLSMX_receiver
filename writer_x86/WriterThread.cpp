@@ -63,6 +63,15 @@ void *run_writer_thread(void* thread_arg) {
     // Lock is necessary for calculating loop condition - number of remaining frames
     pthread_mutex_lock(&remaining_images_mutex[card_id]);
 
+    // Calculate how many preview images to generate
+    size_t preview_stride = int(PREVIEW_FREQUENCY/experiment_settings.frame_time);
+
+    // Stride need to be increased, if it would overflow preview buffer
+    if ( MAX_PREVIEW < experiment_settings.nimages_to_write / preview_stride)
+        preview_stride = experiment_settings.nimages_to_write / MAX_PREVIEW;
+
+    std::cout << "Stride " << preview_stride << std::endl;
+
     // Receive data and write to file
     while (remaining_images[card_id] > 0) {
         // At the very end of the data collection, no need of adding new work requests
@@ -108,14 +117,16 @@ void *run_writer_thread(void* thread_arg) {
 
         // TODO: Include gaps
         if (frame_id % PREVIEW_STRIDE == 0) {
+            size_t preview_id = frame_id / PREVIEW_STRIDE;
             if (experiment_settings.pixel_depth == 4) {
                 for (int i = 0; i < XPIXEL * YPIXEL / NCARDS; i++)
                     // Card id needs flipping, to correctly get up-down
-                    preview[i+(1-card_id) * (XPIXEL * YPIXEL / NCARDS)] = ((int32_t *) ib_buffer_location)[i];
+                    preview[preview_id * PREVIEW_SIZE + i+(1-card_id) * (XPIXEL * YPIXEL / NCARDS)] = ((int32_t *) ib_buffer_location)[i];
             } else {
                 for (int i = 0; i < XPIXEL * YPIXEL / NCARDS; i++)
-                    preview[i+(1-card_id) * (XPIXEL * YPIXEL / NCARDS)] = ((int16_t *) ib_buffer_location)[i];
+                    preview[preview_id * PREVIEW_SIZE + i+(1-card_id) * (XPIXEL * YPIXEL / NCARDS)] = ((int16_t *) ib_buffer_location)[i];
             }
+            preview_image_available[preview_id*NCARDS+card_id] = true;
         }
 
         char *output_buffer;

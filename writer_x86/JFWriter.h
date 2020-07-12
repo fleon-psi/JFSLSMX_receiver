@@ -36,7 +36,9 @@
 #define LZ4_BLOCK_SIZE  0
 #define ZSTD_BLOCK_SIZE (8*514*1030)
 
-#define PREVIEW_FREQUENCY 1.0
+#define MAX_PREVIEW 1000
+#define PREVIEW_FREQUENCY 0.2
+
 #define PREVIEW_STRIDE (int(PREVIEW_FREQUENCY/experiment_settings.frame_time))
 #define PREVIEW_SIZE (XPIXEL * YPIXEL)
 
@@ -147,8 +149,8 @@ extern pthread_mutex_t total_compressed_size_mutex;
 extern uint64_t remaining_images[NCARDS];
 extern pthread_mutex_t remaining_images_mutex[NCARDS];
 
-extern std::vector<int32_t> preview;
-//extern pthread_mutex_t preview_mutex; // not protected by mutex at the moment, but might be used in the future
+extern int32_t *preview; // not protected by mutex!
+extern std::vector<bool> preview_image_available;
 
 extern std::vector<spot_t> spots;
 extern pthread_mutex_t spots_mutex;
@@ -226,7 +228,9 @@ int setup_zeromq_pull_socket(void **socket, int number);
 int close_zeromq_pull_socket(void **socket);
 int send_zeromq(void *zeromq_socket, void *data, size_t data_size, int frame, int chunk);
 
-int update_jpeg_preview(std::vector<uint8_t> &jpeg_out, float contrast = 50.0);
-int update_jpeg_preview_log(std::vector<uint8_t> &jpeg_out, float contrast = 50.0);
- 
+// Preview
+int update_jpeg_preview(std::vector<uint8_t> &jpeg_out, size_t frame, float contrast = 50.0);
+int update_jpeg_preview_log(std::vector<uint8_t> &jpeg_out, size_t frame, float contrast = 50.0);
+int newest_preview_image();
+
 #endif // JFWRITER_H_

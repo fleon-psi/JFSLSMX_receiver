@@ -30,7 +30,18 @@
 #define GREEN_MAX 0
 #define BLUE_MAX 0
 
-int update_jpeg_preview(std::vector<uchar> &jpeg_out, float contrast) {
+int newest_preview_image() {
+    for (int j = MAX_PREVIEW - 1;j >= 0; j-- ) {
+        int count = 0;
+        for (int i = 0; i < NCARDS; i ++) {
+            if (preview_image_available[j*NCARDS+i]) count++;
+        }
+        if (count == NCARDS) return j;
+    }
+    return -1;
+}
+
+int update_jpeg_preview(std::vector<uchar> &jpeg_out, size_t image_number, float contrast) {
     cv::setNumThreads(0);
 
     cv::Mat values(YPIXEL, XPIXEL, CV_8U);
@@ -38,7 +49,7 @@ int update_jpeg_preview(std::vector<uchar> &jpeg_out, float contrast) {
     // Color transformation
     for (int i = 0; i < YPIXEL; i++) {
         for (int j = 0; j < XPIXEL; j++) {
-            float tmp = ((float) preview[i*XPIXEL+j]) / contrast;
+            float tmp = ((float) preview[image_number * PREVIEW_SIZE + i*XPIXEL+j]) / contrast;
             if (tmp >= 1.0) 
                values.at<uchar>(i,j) = 255;
             if (tmp <= 0.0)
@@ -51,15 +62,12 @@ int update_jpeg_preview(std::vector<uchar> &jpeg_out, float contrast) {
 
     cv::Mat image(YPIXEL, XPIXEL, CV_8UC3);
     cv::applyColorMap(values, image,  cv::COLORMAP_VIRIDIS);
-//    cv::blur(image, image, cv::Size(3,3));
 
-//    cv::Mat tmp(YPIXEL/2, XPIXEL/2, CV_8UC3);
-//    cv::pyrDown(image, tmp);
-    cv::imencode(".jpeg", image, jpeg_out); 
+    cv::imencode(".jpeg", image, jpeg_out);
     return 0;
 }
 
-int update_jpeg_preview_log(std::vector<uchar> &jpeg_out, float contrast) {
+int update_jpeg_preview_log(std::vector<uchar> &jpeg_out, size_t image_number, float contrast) {
     cv::setNumThreads(0);
 
     cv::Mat values(YPIXEL, XPIXEL, CV_8U);
@@ -67,7 +75,7 @@ int update_jpeg_preview_log(std::vector<uchar> &jpeg_out, float contrast) {
     // Color transformation
     for (int i = 0; i < YPIXEL; i++) {
         for (int j = 0; j < XPIXEL; j++) {
-            float tmp = preview[i*XPIXEL+j];
+            float tmp = preview[image_number * PREVIEW_SIZE + i*XPIXEL+j];
             if (tmp >= contrast) 
                values.at<uchar>(i,j) = 255;
             if (tmp < 1.0)
