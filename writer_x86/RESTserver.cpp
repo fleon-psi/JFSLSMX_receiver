@@ -339,8 +339,6 @@ void fetch_preview(const Pistache::Rest::Request &request, Pistache::Http::Respo
     if (query.has("contrast"))
         contrast = std::stof(query.get("contrast").get());
 
-    auto variable = request.param(":variable").as<double>();
-
     auto *jpeg = new std::vector<uint8_t>;
     if (log)
         update_jpeg_preview_log(*jpeg, image_number, contrast);
@@ -463,7 +461,7 @@ int main() {
 
     // To reload via browser, something has to change in the address
     // So dummy variable x is added - it is not read, nor parsed, so JS can change it at regular intervals
-    Pistache::Rest::Routes::Get(router, "/preview", Pistache::Rest::Routes::bind(&fetch_preview));
+    Pistache::Rest::Routes::Get(router, "/preview.jpeg", Pistache::Rest::Routes::bind(&fetch_preview));
 
     Pistache::Rest::Routes::Get(router, "/spot/:variable", Pistache::Rest::Routes::bind(&fetch_spot));
     Pistache::Rest::Routes::Get(router, "/SPOT.XDS", Pistache::Rest::Routes::bind(&fetch_spot_xds));

@@ -304,10 +304,10 @@ std::map<std::string, parameter_t> detector_options = {
                                [](nlohmann::json &in) { throw read_only_exception(); },
                                "Resolution limit on 4 edges of the detector"
                        }},
-        {"preview_image_number", {"", PARAMETER_UINT,0.0,0.0, true,
-                               [](nlohmann::json &out) { out = newest_preview_image();},
+        {"preview_status", {"", PARAMETER_UINT,0.0,0.0, true,
+                               [](nlohmann::json &out) { out["newest"] = newest_preview_image(); out["total"] = expected_preview_images();},
                                [](nlohmann::json &in) { throw read_only_exception(); },
-                               "Highest number of image with usefule preview"
+                               "Status of preview"
                        }}
 
 };
@@ -331,7 +331,7 @@ void set_default_parameters() {
     experiment_settings.connect_spots_between_frames = true;
     experiment_settings.strong_pixel = 5.0;
     experiment_settings.min_pixels_per_spot = 3.0;
-    experiment_settings.spot_finding_resolution_limit = 2.0;
+    experiment_settings.spot_finding_resolution_limit = 1.5;
 
     writer_settings.compression = JF_COMPRESSION_BSHUF_LZ4;
 

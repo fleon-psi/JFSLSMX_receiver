@@ -41,6 +41,17 @@ int newest_preview_image() {
     return -1;
 }
 
+size_t expected_preview_images() {
+    // Calculate how many preview images to generate
+    size_t preview_stride = int(PREVIEW_FREQUENCY/experiment_settings.frame_time);
+
+    // Stride need to be increased, if it would overflow preview buffer
+    if ( MAX_PREVIEW < experiment_settings.nimages_to_write / preview_stride)
+        preview_stride = experiment_settings.nimages_to_write / MAX_PREVIEW;
+
+    return experiment_settings.nimages_to_write / preview_stride;
+}
+
 int update_jpeg_preview(std::vector<uchar> &jpeg_out, size_t image_number, float contrast) {
     cv::setNumThreads(0);
 
@@ -81,7 +92,7 @@ int update_jpeg_preview_log(std::vector<uchar> &jpeg_out, size_t image_number, f
             if (tmp < 1.0)
                values.at<uchar>(i,j) = 0;
             else
-               values.at<uchar>(i,j) = (uchar) std::lround(255.0 * log(tmp)/log(contrast));
+               values.at<uchar>(i,j) = (uchar) std::lround(255.0 * logf(tmp)/logf(contrast));
         }
     }
 

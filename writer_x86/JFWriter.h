@@ -232,5 +232,6 @@ int send_zeromq(void *zeromq_socket, void *data, size_t data_size, int frame, in
 int update_jpeg_preview(std::vector<uint8_t> &jpeg_out, size_t frame, float contrast = 50.0);
 int update_jpeg_preview_log(std::vector<uint8_t> &jpeg_out, size_t frame, float contrast = 50.0);
 int newest_preview_image();
+size_t expected_preview_images();
 
 #endif // JFWRITER_H_
