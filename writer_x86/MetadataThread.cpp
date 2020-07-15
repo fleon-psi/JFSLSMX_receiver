@@ -42,7 +42,7 @@ float calculate_wilson_b() {
     // This is fitting ln<i> = a + b (1/d^2)
     // B = -b 2 in XDS terms
     if (denominator != 0) return - 2 * (numerator/ denominator);
-    // Protect for denominator == 0
+        // Protect for denominator == 0
     else return -1;
 }
 
@@ -67,31 +67,31 @@ void *run_metadata_thread(void* thread_arg) {
     size_t total_chunks = experiment_settings.nimages_to_write / images_per_stream;
     // Account for leftover
     if (experiment_settings.nimages_to_write - total_chunks * images_per_stream > 0)
-           total_chunks++;
+        total_chunks++;
 
     if (experiment_settings.enable_spot_finding) {
         size_t omega_range = std::lround(experiment_settings.nimages_to_write * experiment_settings.omega_angle_per_image);
 
-        for (int i = 0; i < total_chunks; i++) {
+        for (int chunk = 0; chunk < total_chunks; chunk++) {
             // Receive spots found by spot finder
             size_t spot_data_size;
             tcp_receive(writer_connection_settings[card_id].sockfd,(char *) &spot_data_size, sizeof(size_t));
 
             std::vector<spot_t> local_spots(spot_data_size);
             if (spot_data_size > 0)
-               tcp_receive(writer_connection_settings[card_id].sockfd, (char *) local_spots.data(), spot_data_size * sizeof(spot_t));
+                tcp_receive(writer_connection_settings[card_id].sockfd, (char *) local_spots.data(), spot_data_size * sizeof(spot_t));
 
             // Merge spots with the global list
             pthread_mutex_lock(&spots_mutex);
             spots.insert(spots.end(), local_spots.begin(), local_spots.end());
-            pthread_mutex_unlock(&spots_mutex);        
+            pthread_mutex_unlock(&spots_mutex);
 
             // Update spots per frame statistics
             pthread_mutex_lock(&spots_statistics_mutex);
             for (int i = 0; i < local_spots.size() ; i++) {
                 size_t omega = (size_t) std::lround(local_spots[i].z * experiment_settings.omega_angle_per_image);
                 if ((omega >= 0) && (omega < omega_range))
-                spot_count_per_image[omega]++;
+                    spot_count_per_image[omega]++;
 
                 if (local_spots[i].d > spot_statistics.resolution_limit) {
                     float one_over_d2 = 1 / (local_spots[i].d * local_spots[i].d);
@@ -121,19 +121,19 @@ void *run_metadata_thread(void* thread_arg) {
          &(online_statistics[card_id]), sizeof(online_statistics_t));
 
     tcp_receive(writer_connection_settings[card_id].sockfd,
-         (char *) (gain_pedestal.gainG0 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
+                (char *) (gain_pedestal.gainG0 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
     tcp_receive(writer_connection_settings[card_id].sockfd,
-         (char *) (gain_pedestal.gainG1 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
+                (char *) (gain_pedestal.gainG1 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
     tcp_receive(writer_connection_settings[card_id].sockfd,
-         (char *) (gain_pedestal.gainG2 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
+                (char *) (gain_pedestal.gainG2 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
     tcp_receive(writer_connection_settings[card_id].sockfd,
-         (char *) (gain_pedestal.pedeG1 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
+                (char *) (gain_pedestal.pedeG1 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
     tcp_receive(writer_connection_settings[card_id].sockfd,
-         (char *) (gain_pedestal.pedeG2 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
+                (char *) (gain_pedestal.pedeG2 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
     tcp_receive(writer_connection_settings[card_id].sockfd,
-         (char *) (gain_pedestal.pedeG0 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
+                (char *) (gain_pedestal.pedeG0 + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
     tcp_receive(writer_connection_settings[card_id].sockfd,
-         (char *) (gain_pedestal.pixel_mask + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
+                (char *) (gain_pedestal.pixel_mask + card_id * NPIXEL), NPIXEL * sizeof(uint16_t));
 
     // Check magic number again - but don't quit, as the program is finishing anyway soon
     exchange_magic_number(writer_connection_settings[card_id].sockfd);
