@@ -685,7 +685,7 @@ int write_data_files_links() {
 int write_spots() {
     hid_t grp = createGroup(master_file_id, "/entry/processing","NXcollection");
 
-    double *tmp = (double *) calloc(3*spots.size(),sizeof(double));
+    auto tmp = (double *) calloc(2*spots.size(),sizeof(double));
 
     for (int i = 0; i < spots.size(); i++)
         tmp[i]   = spots[i].z;
@@ -714,13 +714,6 @@ int write_spots() {
         tmp[2*i+1]   = spots[i].y;
     }
     saveDouble2D(grp, "spot_coord", tmp, "", spots.size(), 2);
-
-    for (int i = 0; i < spots.size(); i++) {
-        tmp[3*i]     = spots[i].q[0];
-        tmp[3*i+1]   = spots[i].q[1];
-        tmp[3*i+2]   = spots[i].q[2];
-    }
-    saveDouble2D(grp, "spot_recip_coord", tmp, "", spots.size(), 3);
 
     free(tmp);
     H5Gclose(grp);

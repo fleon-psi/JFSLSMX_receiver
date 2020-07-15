@@ -124,7 +124,6 @@ struct ib_settings_t {
 struct spot_t {
     float x,y,z;      // Coordinates in "data" array (not exactly detector configuration)
     float d;          // Resolution [in Angstrom]
-    float q[3];       // Reciprocal vector for "node", see Gevorkov et al. 2019
     float photons;    // total photon count
     int16_t min_col, max_col, min_line, max_line; // Limits of the spot in X and Y directions
     uint32_t first_frame, last_frame; // Limits of the spot in time direction

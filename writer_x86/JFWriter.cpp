@@ -286,10 +286,8 @@ void reset_spot_statistics() {
 
     // Resolution ring statistics
     // Not ideal, but resolution of edge with smaller d is selected.
-    spot_statistics.resolution_limit = std::max((float)experiment_settings.spot_finding_resolution_limit,
-            std::max(std::min(get_resolution_bottom(),get_resolution_top()),
-                                                std::min(get_resolution_left(),get_resolution_right())));
-    spot_statistics.resolution_bins = 20;
+    spot_statistics.resolution_limit = (float)experiment_settings.spot_finding_resolution_limit;
+    spot_statistics.resolution_bins = 40;
 
     spot_statistics.intensity.clear();
     spot_statistics.intensity.resize(spot_statistics.resolution_bins, 0);

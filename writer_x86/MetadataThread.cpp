@@ -25,7 +25,6 @@
 
 
 float calculate_wilson_b() {
-
     float sum_x = 0.0;
     float sum_y = 0.0;
     float sum_x2 = 0.0;

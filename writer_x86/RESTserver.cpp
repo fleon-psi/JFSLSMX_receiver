@@ -378,13 +378,7 @@ void fetch_spot(const Pistache::Rest::Request &request, Pistache::Http::Response
             spot_json["frames"] = spots[i].last_frame - spots[i].first_frame + 1;
             j.push_back(spot_json);
         }
-    } else if (variable == "reciprocal") {
-        for (int i = 0; i < spots.size(); i++) {
-            j["x"].push_back(spots[i].q[0]);
-            j["y"].push_back(spots[i].q[1]);
-            j["z"].push_back(spots[i].q[2]);
-        }
-    }
+    } 
 
     pthread_mutex_unlock(&spots_statistics_mutex);
 

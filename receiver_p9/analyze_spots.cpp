@@ -119,9 +119,6 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
     // there is one mpa per fragment analyzed by GPU (2 horizontally connected modules)
     strong_pixel_maps_t strong_pixel_maps = strong_pixel_maps_t(images*2);
 
-    float one_over_wavelength = experiment_settings.energy_in_keV /  WVL_1A_IN_KEV; // [A^-1]
-    float omega_increment_in_radian = experiment_settings.omega_angle_per_image * M_PI / 180.0;
-
     // Transfer strong pixels into dictionary
     for (size_t i = 0; i < images*2; i++) {
         size_t addr = i * MAX_STRONG;
@@ -157,20 +154,10 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
                 detector_to_lab(spot.x, spot.y, lab);
 
                 // Get resolution
-                spot.d = get_resolution(lab);
+                spot.d = get_resolution(lab, WVL_1A_IN_KEV / (experiment_settings.energy_in_keV));
 
                 // Check spot resolution
                 if (spot.d > experiment_settings.spot_finding_resolution_limit) {
-                    // Get reciprocal coordinates of spot
-                    // For 3D spot-finding/indexing one needs to "rotate" reciprocal space vectors
-                    // back to omega = 0
-                    if (omega_increment_in_radian != 0.0) {
-                        float p[3];
-                        lab_to_reciprocal(p, lab, one_over_wavelength);
-                        reciprocal_rotate(spot.q, p, omega_increment_in_radian * spot.z);
-                    } else
-                        lab_to_reciprocal(spot.q, lab, one_over_wavelength);
-
                     // Spot is put on the list
                     spots.push_back(spot);
                 }

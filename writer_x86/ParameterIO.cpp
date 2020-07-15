@@ -289,21 +289,6 @@ std::map<std::string, parameter_t> detector_options = {
                                [](nlohmann::json &in) { throw read_only_exception(); },
                                "Number of bad pixels (per module)"
                        }},
-        {"resolution_limit_edges", {"", PARAMETER_FLOAT, 0.0, 0.0, true,
-                               [](nlohmann::json &out) {
-                                   out = {get_resolution_left(), get_resolution_right(), get_resolution_top(), get_resolution_bottom()};
-                               },
-                               [](nlohmann::json &in) { throw read_only_exception(); },
-                               "Resolution limit on 4 edges of the detector"
-                       }},
-        {"resolution_limit_edge", {"", PARAMETER_FLOAT, 0.0, 0.0, true,
-                               [](nlohmann::json &out) {
-                                   out = std::max(std::max(get_resolution_left(), get_resolution_right()),
-                                                  std::max(get_resolution_top(), get_resolution_bottom()));
-                               },
-                               [](nlohmann::json &in) { throw read_only_exception(); },
-                               "Resolution limit on 4 edges of the detector"
-                       }},
         {"preview_status", {"", PARAMETER_UINT,0.0,0.0, true,
                                [](nlohmann::json &out) { out["newest"] = newest_preview_image(); out["total"] = expected_preview_images();},
                                [](nlohmann::json &in) { throw read_only_exception(); },
