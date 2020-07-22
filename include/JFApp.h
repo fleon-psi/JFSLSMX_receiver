@@ -93,6 +93,9 @@ struct experiment_settings_t {
     double   strong_pixel;                 // STRONG_PIXEL in XDS
     uint16_t max_spot_depth;               // Maximum images per spot
     uint16_t min_pixels_per_spot;          // Minimum pixels per spot
+
+    double   scattering_vector[3];  // S0 in Kabsch Acta D paper
+    double   rotation_axis[3];      // m2 in Kabsch Acta D paper
 };
 
 struct receiver_output_t {

@@ -16,7 +16,7 @@
 
 #include <iostream>
 
-#include "include/JFApp.h"
+#include "../include/JFApp.h"
 
 int setup_ibverbs(ib_settings_t &settings, std::string ib_device_name, size_t send_queue_size, size_t receive_queue_size) {
 	struct ibv_device **dev_list;
