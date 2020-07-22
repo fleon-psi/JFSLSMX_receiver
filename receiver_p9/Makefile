@@ -44,7 +44,7 @@ CUDA_LIBS=$(CUDA_PATH)/lib64/libcudart_static.a -lrt
 
 CPPFLAGS= -I. -I../include ${SNAP_INCLUDE}
 
-RCV_SRCS=analyze_spots.o JFReceiver.o sharedVariables.o SendThread.o ../IB_Transport.o SnapThread.o find_spots.o
+RCV_SRCS=analyze_spots.o JFReceiver.o sharedVariables.o SendThread.o ../common/IB_Transport.o SnapThread.o find_spots.o
 
 all: JFReceiver
 
