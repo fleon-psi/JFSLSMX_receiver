@@ -19,6 +19,7 @@
 
 #include <vector>
 #include <set>
+#include <map>
 
 #include "../include/JFApp.h"
 #define FRAME_LIMIT 1000000L
@@ -78,8 +79,9 @@ typedef std::map<coordxy_t, float> strong_pixel_map_t;
 typedef std::vector<strong_pixel_map_t> strong_pixel_maps_t;
 // There is one map per 1/2 frame
 
-extern std::map<coordxy_t, uint64_t> strong_pixel_count_map;
-extern pthread_mutex_t strong_pixel_count_map_mutex;
+extern uint64_t *strong_pixel_count;
+extern const strong_pixel_count_size;
+extern pthread_mutex_t strong_pixel_count_mutex;
 
 // Buffers for communication with the FPGA
 extern int16_t *frame_buffer;
@@ -99,7 +101,7 @@ extern header_info_t *jf_packet_headers;
 extern ib_settings_t ib_settings;
 
 // IB buffer
-extern size_t ib_buffer_size;
+extern const size_t ib_buffer_size;
 extern char *ib_buffer;
 
 // TCP/IP socket

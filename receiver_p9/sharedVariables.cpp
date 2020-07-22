@@ -20,7 +20,8 @@ size_t frame_buffer_size = 0;
 size_t status_buffer_size = 0;
 size_t gain_pedestal_data_size = 0;
 size_t jf_packet_headers_size = 0;
-size_t ib_buffer_size = COMPOSED_IMAGE_SIZE * RDMA_SQ_SIZE * sizeof(int16_t);
+const size_t ib_buffer_size = COMPOSED_IMAGE_SIZE * RDMA_SQ_SIZE * sizeof(int16_t);
+const size_t strong_pixel_count_size = LINES * COLS * (NMODULES/2) * sizeof(uint64_t);
 
 receiver_settings_t receiver_settings;
 ib_settings_t ib_settings;
@@ -60,5 +61,5 @@ int writer_threads_done[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 
 std::set<std::pair<int16_t, int16_t> > bad_pixels;
 
-std::map<coordxy_t, uint64_t> strong_pixel_count_map;
-pthread_mutex_t strong_pixel_count_map_mutex = PTHREAD_MUTEX_INITIALIZER;
+uint64_t *strong_pixel_count = NULL;
+pthread_mutex_t strong_pixel_count_mutex = PTHREAD_MUTEX_INITIALIZER;

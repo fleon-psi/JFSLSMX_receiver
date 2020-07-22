@@ -121,10 +121,11 @@ int allocate_memory() {
     gain_pedestal_data = (uint16_t *) mmap (NULL, gain_pedestal_data_size, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_POPULATE, -1, 0);
     jf_packet_headers  = (header_info_t *) mmap (NULL, jf_packet_headers_size, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_POPULATE, -1, 0);
     ib_buffer          = (char *) mmap (NULL, ib_buffer_size, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_POPULATE, -1, 0);
+    strong_pixel_count = (uint64_t *) malloc(strong_pixel_count_size);
 
     if ((frame_buffer == NULL) || (status_buffer == NULL) ||
         (gain_pedestal_data == NULL) || (jf_packet_headers == NULL) ||
-        (ib_buffer == NULL)) {
+        (ib_buffer == NULL) || (strong_pixel_count == NULL)) {
         std::cerr << "Memory allocation error" << std::endl;
         return 1;
     }
@@ -148,6 +149,8 @@ void deallocate_memory() {
     munmap(gain_pedestal_data, gain_pedestal_data_size);
     munmap(jf_packet_headers, jf_packet_headers_size);
     munmap(ib_buffer, ib_buffer_size);
+
+    free(strong_pixel_count);
 }
 
 int load_bin_file(std::string fname, char *dest, size_t size) {
@@ -505,6 +508,7 @@ int main(int argc, char **argv) {
 
         // Reset status buffer
         memset(status_buffer, 0x0, status_buffer_size);
+        memset(strong_pixel_count, 0x0, strong_pixel_count_size);
     }
 
 #ifndef RECEIVE_FROM_FILE

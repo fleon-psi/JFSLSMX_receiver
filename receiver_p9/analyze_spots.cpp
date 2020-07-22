@@ -112,7 +112,7 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
     // there is one map per fragment analyzed by GPU (2 horizontally connected modules)
     strong_pixel_maps_t strong_pixel_maps = strong_pixel_maps_t(images*2);
 
-    pthread_mutex_lock(&strong_pixel_count_map_mutex);
+    pthread_mutex_lock(&strong_pixel_count_mutex);
 
     // Transfer strong pixels into dictionary
     for (size_t i = 0; i < images*2; i++) {
@@ -123,18 +123,13 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
         // Photons equal zero could mean that kernel was not at all executed
         while ((k < MAX_STRONG) && (host_out[addr + k].col >= 0) && (host_out[addr + k].line >= 0) && (host_out[addr+k].photons > 0)) {
             coordxy_t key = coordxy_t(host_out[addr + k].col, host_out[addr + k].line + (i%2) * LINES);
-
-            if (strong_pixel_count_map.find(key) != strong_pixel_count_map.end())
-                strong_pixel_count_map[key] += 1;
-            else
-                strong_pixel_count_map[key] = 1;
-
+            strong_pixel_count[key.first + key.second * COLS] += 1;
             if (bad_pixels.find(key) == bad_pixels.end())
                 strong_pixel_maps[i][key] = host_out[addr + k].photons / ((2*NBX+1)*(2*NBY+1));
             k++;
         }
     }
-    pthread_mutex_lock(&strong_pixel_count_map_mutex);
+    pthread_mutex_lock(&strong_pixel_count_mutex);
 
     for (int i = 0; i < images*2; i++) {
         strong_pixel_map_t::iterator iterator = strong_pixel_maps[i].begin();
