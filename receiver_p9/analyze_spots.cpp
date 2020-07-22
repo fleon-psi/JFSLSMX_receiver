@@ -151,7 +151,7 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
 
                 // Find lab coordinates of the pixel
                 float lab[3];
-                detector_to_lab(spot.x, spot.y, lab);
+                detector_to_lab(spot.x, spot.y, lab, experiment_settings.beam_x, experiment_settings.beam_y, experiment_settings.detector_distance);
 
                 // Get resolution
                 spot.d = get_resolution(lab, WVL_1A_IN_KEV / (experiment_settings.energy_in_keV));
