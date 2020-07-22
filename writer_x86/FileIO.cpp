@@ -576,8 +576,8 @@ int write_detector_parameters() {
         saveInt(det_grp,"saturation_value", INT16_MAX-10);
         saveInt(det_grp,"underload_value", INT16_MIN+10);
     } else {
-        saveInt(det_grp,"saturation_value", INT32_MAX-1);
-        saveInt(det_grp,"underload_value", INT32_MIN+1);
+        saveInt(det_grp,"saturation_value", OVERFLOW_32BIT-1);
+        saveInt(det_grp,"underload_value", UNDERFLOW_32BIT+1);
     }
 
     herr_t status = H5Lcreate_soft("/entry/data/data_000001", det_grp, "data", H5P_DEFAULT, H5P_DEFAULT);

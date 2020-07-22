@@ -52,6 +52,9 @@
 #define HORIZONTAL_GAP_PIXELS  36
 #define VERTICAL_GAP_PIXELS     8
 
+#define OVERFLOW_32BIT         (1<<27)
+#define UNDERFLOW_32BIT        (-OVERFLOW_32BIT)
+
 // Settings exchanged between writer and receiver
 struct experiment_settings_t {
     uint8_t  conversion_mode;

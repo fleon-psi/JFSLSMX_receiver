@@ -102,13 +102,13 @@ void copy_line_mid(int16_t *destination, int16_t* source, ssize_t offset) {
 
 inline int32_t half32(int32_t in) {
     int32_t tmp = in;
-    if ((in > INT32_MIN) && (in < INT32_MAX)) tmp /= 2;
+    if ((in > UNDERFLOW_32BIT) && (in < OVERFLOW_32BIT)) tmp /= 2;
     return tmp;
 }
 
 inline int32_t quarter32(int32_t in) {
     int32_t tmp = in;
-    if ((in > INT32_MIN) && (in < INT32_MAX)) tmp /= 4;
+    if ((in > UNDERFLOW_32BIT) && (in < OVERFLOW_32BIT)) tmp /= 4;
     return tmp;
 }
 
@@ -324,9 +324,9 @@ void *run_send_thread(void *in_threadarg) {
                         size_t pixel0_in = ((((collected_frame + j) % FRAME_BUF_SIZE) * NMODULES +  module) * MODULE_LINES + line ) * MODULE_COLS;
                         for (int col = 0; col < MODULE_COLS; col++) {
                             int16_t tmp = frame_buffer[pixel0_in + col];
-                            if (tmp < INT16_MIN + 10) summed_buffer[col] = INT32_MIN;  
-                            if ((tmp > INT16_MAX - 10) && (summed_buffer[col] != INT32_MIN)) summed_buffer[col] = INT32_MAX;
-                            if ((summed_buffer[col] != INT32_MIN) && (summed_buffer[col] != INT32_MAX)) summed_buffer[col] += tmp;  
+                            if (tmp < INT16_MIN + 10) summed_buffer[col] = UNDERFLOW_32BIT;
+                            if ((tmp > INT16_MAX - 10) && (summed_buffer[col] > UNDERFLOW_MIN)) summed_buffer[col] = OVERFLOW_32BIT;
+                            if ((summed_buffer[col] > UNDERFLOW_32BIT) && (summed_buffer[col] < OVERFLOW_32BIT)) summed_buffer[col] += tmp;
                         }
                     }
                     if ((line == 255) || (line == 256)) {
