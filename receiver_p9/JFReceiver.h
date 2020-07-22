@@ -80,7 +80,7 @@ typedef std::vector<strong_pixel_map_t> strong_pixel_maps_t;
 // There is one map per 1/2 frame
 
 extern uint64_t *strong_pixel_count;
-extern const strong_pixel_count_size;
+extern const size_t strong_pixel_count_size;
 extern pthread_mutex_t strong_pixel_count_mutex;
 
 // Buffers for communication with the FPGA
