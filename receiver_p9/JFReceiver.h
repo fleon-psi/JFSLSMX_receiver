@@ -71,6 +71,16 @@ struct strong_pixel {
     float photons;      // intensity of the pixel divide by (2*NBX+1) * (2*NBY+1) to get background subtracted photon count
 };
 
+typedef std::pair<int16_t, int16_t> coordxy_t; // This is simply (x, y)
+typedef std::map<coordxy_t, float> strong_pixel_map_t;
+// This is mapping (x,y) --> intensity
+// it allows to find if there is spot in (x,y) in log time
+typedef std::vector<strong_pixel_map_t> strong_pixel_maps_t;
+// There is one map per 1/2 frame
+
+extern std::map<coordxy_t, uint64_t> strong_pixel_count_map;
+extern pthread_mutex_t strong_pixel_count_map_mutex;
+
 // Buffers for communication with the FPGA
 extern int16_t *frame_buffer;
 extern size_t frame_buffer_size;

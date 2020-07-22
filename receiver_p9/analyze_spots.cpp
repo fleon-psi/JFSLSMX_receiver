@@ -41,13 +41,6 @@ void merge_spots(spot_t &spot1, const spot_t spot2) {
     if (spot2.last_frame > spot1.last_frame) spot1.last_frame = spot2.last_frame;
 }
 
-typedef std::pair<int16_t, int16_t> coordxy_t; // This is simply (x, y)
-typedef std::map<coordxy_t, float> strong_pixel_map_t;
-// This is mapping (x,y) --> intensity
-// it allows to find if there is spot in (x,y) in log time
-typedef std::vector<strong_pixel_map_t> strong_pixel_maps_t;
-// There is one map per 1/2 frame
-
 // Creates a continuous spot
 // strong pixels are loaded into dictionary (one dictionary per frame)
 // and routine checks if neighboring pixels are also in dictionary (likely in log(N) time)
@@ -116,8 +109,10 @@ spot_t add_pixel(strong_pixel_maps_t &strong_pixel_maps, size_t i, strong_pixel_
 
 void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool connect_frames, size_t images, size_t image0) {
     // key is location of strong pixel - value is number of photons
-    // there is one mpa per fragment analyzed by GPU (2 horizontally connected modules)
+    // there is one map per fragment analyzed by GPU (2 horizontally connected modules)
     strong_pixel_maps_t strong_pixel_maps = strong_pixel_maps_t(images*2);
+
+    pthread_mutex_lock(&strong_pixel_count_map_mutex);
 
     // Transfer strong pixels into dictionary
     for (size_t i = 0; i < images*2; i++) {
@@ -128,11 +123,18 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
         // Photons equal zero could mean that kernel was not at all executed
         while ((k < MAX_STRONG) && (host_out[addr + k].col >= 0) && (host_out[addr + k].line >= 0) && (host_out[addr+k].photons > 0)) {
             coordxy_t key = coordxy_t(host_out[addr + k].col, host_out[addr + k].line + (i%2) * LINES);
+
+            if (strong_pixel_count_map.find(key) != strong_pixel_count_map.end())
+                strong_pixel_count_map[key] += 1;
+            else
+                strong_pixel_count_map[key] = 1;
+
             if (bad_pixels.find(key) == bad_pixels.end())
                 strong_pixel_maps[i][key] = host_out[addr + k].photons / ((2*NBX+1)*(2*NBY+1));
             k++;
         }
     }
+    pthread_mutex_lock(&strong_pixel_count_map_mutex);
 
     for (int i = 0; i < images*2; i++) {
         strong_pixel_map_t::iterator iterator = strong_pixel_maps[i].begin();

@@ -59,3 +59,6 @@ pthread_cond_t writer_threads_done_cond[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 int writer_threads_done[NCUDA_STREAMS*CUDA_TO_IB_BUFFER];
 
 std::set<std::pair<int16_t, int16_t> > bad_pixels;
+
+std::map<coordxy_t, uint64_t> strong_pixel_count_map;
+pthread_mutex_t strong_pixel_count_map_mutex = PTHREAD_MUTEX_INITIALIZER;
