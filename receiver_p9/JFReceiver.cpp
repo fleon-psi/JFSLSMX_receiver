@@ -109,11 +109,11 @@ int parse_input(int argc, char **argv) {
 }
 
 int allocate_memory() {
+    // TODO: Put all as const variables declared externally
     frame_buffer_size       = FRAME_BUF_SIZE * NPIXEL * sizeof(int16_t); // can store FRAME_BUF_SIZE frames
     status_buffer_size      = FRAME_LIMIT*NMODULES*128/8+64;   // can store 1 bit per each ETH packet expected
     gain_pedestal_data_size = 7 * 2 * NPIXEL;  // each entry to in_parameters_array is 2 bytes and there are 6 constants per pixel + mask
     jf_packet_headers_size  = FRAME_LIMIT * NMODULES * sizeof(header_info_t);
-    ib_buffer_size          = COMPOSED_IMAGE_SIZE * RDMA_SQ_SIZE * sizeof(int16_t);
 
     // Arrays are allocated with mmap for the higest possible performance. Output is page aligned, so it will be also 64b aligned.
     frame_buffer       = (int16_t *)  mmap (NULL, frame_buffer_size, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS|MAP_POPULATE, -1, 0) ;
