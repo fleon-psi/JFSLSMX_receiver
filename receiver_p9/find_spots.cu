@@ -58,14 +58,16 @@ __global__ void find_spots_colspot(T *in, strong_pixel *out, float strong, int N
 
         // Precalculate squares for first 2*NBY+1 lines
         for (int col = 0; col < COLS; col++) {
-            sum_vert[col]  = in[(line0) * COLS + col];
-            sum2_vert[col] = in[(line0) * COLS + col]*in[(line0) * COLS + col];
+            int64_t tmp = in[(line0) * COLS + col];
+            sum_vert[col]  = tmp;
+            sum2_vert[col] = tmp*tmp;
         }
  
         for (size_t line = 1; line < 2*NBY+1; line++) {
             for (int col = 0; col < COLS; col++) {
-                sum_vert[col]  += in[(line0 + line) * COLS + col];
-                sum2_vert[col] += in[(line0 + line) * COLS + col] * in[(line0 + line) * COLS + col];
+                int64_t tmp = in[(line0 + line) * COLS + col];
+                sum_vert[col]  += tmp;
+                sum2_vert[col] += tmp*tmp;
             }
         }
 
