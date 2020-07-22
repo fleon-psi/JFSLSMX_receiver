@@ -325,7 +325,7 @@ void *run_send_thread(void *in_threadarg) {
                         for (int col = 0; col < MODULE_COLS; col++) {
                             int16_t tmp = frame_buffer[pixel0_in + col];
                             if (tmp < INT16_MIN + 10) summed_buffer[col] = UNDERFLOW_32BIT;
-                            if ((tmp > INT16_MAX - 10) && (summed_buffer[col] > UNDERFLOW_MIN)) summed_buffer[col] = OVERFLOW_32BIT;
+                            if ((tmp > INT16_MAX - 10) && (summed_buffer[col] > UNDERFLOW_32BIT)) summed_buffer[col] = OVERFLOW_32BIT;
                             if ((summed_buffer[col] > UNDERFLOW_32BIT) && (summed_buffer[col] < OVERFLOW_32BIT)) summed_buffer[col] += tmp;
                         }
                     }
