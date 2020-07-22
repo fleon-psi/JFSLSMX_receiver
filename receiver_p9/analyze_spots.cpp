@@ -129,7 +129,7 @@ void analyze_spots(strong_pixel *host_out, std::vector<spot_t> &spots, bool conn
             k++;
         }
     }
-    pthread_mutex_lock(&strong_pixel_count_mutex);
+    pthread_mutex_unlock(&strong_pixel_count_mutex);
 
     for (int i = 0; i < images*2; i++) {
         strong_pixel_map_t::iterator iterator = strong_pixel_maps[i].begin();
