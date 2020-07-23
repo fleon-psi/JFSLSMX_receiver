@@ -378,7 +378,7 @@ void fetch_spot(const Pistache::Rest::Request &request, Pistache::Http::Response
             spot_json["frames"] = spots[i].last_frame - spots[i].first_frame + 1;
             j.push_back(spot_json);
         }
-    } 
+    }
 
     pthread_mutex_unlock(&spots_statistics_mutex);
 
@@ -460,10 +460,12 @@ int main() {
     Pistache::Rest::Routes::Get(router, "/spot/:variable", Pistache::Rest::Routes::bind(&fetch_spot));
     Pistache::Rest::Routes::Get(router, "/SPOT.XDS", Pistache::Rest::Routes::bind(&fetch_spot_xds));
 
+    std::cout << "REST server running" << std::endl;
+
     auto opts = Pistache::Http::Endpoint::options().threads(PISTACHE_THREADS);
     Pistache::Http::Endpoint server(addr);
     server.init(opts);
 
     server.setHandler(router.handler());
-        server.serve();
+    server.serve();
 }
