@@ -39,7 +39,6 @@
 #define MAX_PREVIEW 1000
 #define PREVIEW_FREQUENCY 0.2
 
-#define PREVIEW_STRIDE (int(PREVIEW_FREQUENCY/experiment_settings.frame_time))
 #define PREVIEW_SIZE (XPIXEL * YPIXEL)
 
 extern pthread_mutex_t spots_statistics;

@@ -70,8 +70,6 @@ void *run_writer_thread(void* thread_arg) {
     if ( MAX_PREVIEW < experiment_settings.nimages_to_write / preview_stride)
         preview_stride = experiment_settings.nimages_to_write / MAX_PREVIEW;
 
-    std::cout << "Stride " << preview_stride << std::endl;
-
     // Receive data and write to file
     while (remaining_images[card_id] > 0) {
         // At the very end of the data collection, no need of adding new work requests
@@ -116,8 +114,8 @@ void *run_writer_thread(void* thread_arg) {
         // So there is deliberately no mutex in place
 
         // TODO: Include gaps
-        if (frame_id % PREVIEW_STRIDE == 0) {
-            size_t preview_id = frame_id / PREVIEW_STRIDE;
+        if (frame_id % preview_stride == 0) {
+            size_t preview_id = frame_id / preview_stride;
             if (experiment_settings.pixel_depth == 4) {
                 for (int i = 0; i < XPIXEL * YPIXEL / NCARDS; i++)
                     // Card id needs flipping, to correctly get up-down
