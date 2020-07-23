@@ -67,11 +67,10 @@ int addStringAttribute(hid_t location, std::string const& name, std::string cons
     /* https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_attribute.c */
     hid_t aid = H5Screate(H5S_SCALAR);
     hid_t str_type = H5Tcopy(H5T_C_S1);
-    H5Tset_size(str_type, H5T_VARIABLE);
+    H5Tset_size(str_type, val.length() + 1);
 
     hid_t attr = H5Acreate2(location, name.c_str(), str_type, aid, H5P_DEFAULT, H5P_DEFAULT);
-    const char *s = val.c_str();
-    herr_t ret = H5Awrite(attr, str_type, &s);
+    herr_t ret = H5Awrite(attr, str_type, val.c_str());
 
     ret = H5Sclose(aid);
     ret = H5Tclose(str_type);
@@ -149,7 +148,7 @@ int saveUInt16_3D(hid_t location, std::string const& name, const uint16_t *val, 
     return 0;
 }
 
-int saveString1D(hid_t location, std::string const& name, std::vector<std::string> vals, std::string const& units) {
+int saveString1D(hid_t location, std::string const& name, std::vector<std::string> vals, std::string const& units, size_t len) {
     herr_t status;
 
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
@@ -160,15 +159,16 @@ int saveString1D(hid_t location, std::string const& name, std::vector<std::strin
     hid_t dataspace_id = H5Screate_simple(1, dims, NULL);
 
     hid_t atype = H5Tcopy(H5T_C_S1);
-    H5Tset_size(atype, H5T_VARIABLE);
+    H5Tset_size(atype, len+1);
 
     /* Create the dataset. */
     hid_t dataset_id = H5Dcreate2(location, name.c_str(), atype, dataspace_id,
                                   H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
-    const char *s[vals.size()];
+
+    char s[vals.size()*(len+1)];
     for (int i = 0; i < vals.size(); i++)
-        s[i] = vals[i].c_str();
+        strncpy(s+i*(len+1),vals[i].c_str(), len);
 
     /* Write the dataset. */
     status = H5Dwrite(dataset_id, atype, H5S_ALL, H5S_ALL, H5P_DEFAULT,
@@ -346,16 +346,15 @@ int saveString(hid_t location, std::string const& name, std::string const& val, 
     hid_t dataspace_id = H5Screate(H5S_SCALAR);
 
     hid_t str_type = H5Tcopy(H5T_C_S1);
-    H5Tset_size(str_type, H5T_VARIABLE);
+    H5Tset_size(str_type, val.length() + 1);
 
     /* Create the dataset. */
     hid_t dataset_id = H5Dcreate2(location, name.c_str(), str_type, dataspace_id,
                                   H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
-    const char *s = val.c_str();
     /* Write the dataset. */
     status = H5Dwrite(dataset_id, str_type, H5S_ALL, H5S_ALL, H5P_DEFAULT,
-                      &s);
+                      val.c_str());
 
     if (!units.empty()) addStringAttribute(dataset_id, "units", units);
     if (!short_name.empty()) addStringAttribute(dataset_id, "short_name", short_name);
@@ -618,7 +617,7 @@ int write_detector_group() {
     int32_t group_parent[2] = {-1, 1};
     int32_t group_type[2] = {1, 2};
 
-    saveString1D(grp,"group_names", group_names, "");
+    saveString1D(grp,"group_names", group_names, "", 24);
     saveInt1D(grp, "group_parent", group_parent, "", 2);
     saveInt1D(grp, "group_index", group_index, "", 2);
     saveInt1D(grp, "group_type", group_type, "", 2);
