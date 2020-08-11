@@ -10,3 +10,6 @@
 [submodule "slsDetectorPackage"]
 	path = slsDetectorPackage
 	url = https://github.com/slsdetectorgroup/slsDetectorPackage
+[submodule "cppzmq"]
+        path = cppzmq
+        url = https://github.com/zeromq/cppzmq
