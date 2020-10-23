@@ -26,6 +26,8 @@
 
 #include "JFWriter.h"
 
+#define MAX_STR_LEN 512
+
 #define HDF5_ERROR(ret,func) if (ret) printf("%s(%d) %s: err = %d\n",__FILE__,__LINE__, #func, ret), exit(ret)
 
 hid_t master_file_id;
@@ -64,13 +66,18 @@ int make_dir(std::string const& path) {
 //}
 
 int addStringAttribute(hid_t location, std::string const& name, std::string const& val) {
+    char text[MAX_STR_LEN+1];
+    strncpy(text, val.c_str(), MAX_STR_LEN);
+    text[MAX_STR_LEN] = '\0';
+    int len = strnlen(text, MAX_STR_LEN);
+
     /* https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_attribute.c */
     hid_t aid = H5Screate(H5S_SCALAR);
     hid_t atype = H5Tcopy(H5T_C_S1);
-    H5Tset_size(atype, val.length()+1);
+    H5Tset_size(atype, len);
     H5Tset_strpad(atype,H5T_STR_NULLTERM);
     hid_t attr = H5Acreate2(location, name.c_str(), atype, aid, H5P_DEFAULT, H5P_DEFAULT);
-    herr_t ret = H5Awrite(attr, atype, val.c_str());
+    herr_t ret = H5Awrite(attr, atype, text);
     ret = H5Sclose(aid);
     ret = H5Tclose(atype);
     ret = H5Aclose(attr);
@@ -332,6 +339,11 @@ int saveString(hid_t location, std::string const& name, std::string const& val, 
     std::cout << name << " " << val << std::endl;
     herr_t status;
 
+    char text[MAX_STR_LEN+1];
+    strncpy(text, val.c_str(), MAX_STR_LEN);
+    text[MAX_STR_LEN] = '\0';
+    int len = strnlen(text, MAX_STR_LEN);
+
     // https://support.hdfgroup.org/ftp/HDF5/current/src/unpacked/examples/h5_crtdat.c
     hsize_t dims[1];
     dims[0] = 1;
@@ -340,11 +352,11 @@ int saveString(hid_t location, std::string const& name, std::string const& val, 
     hid_t dataspace_id = H5Screate(H5S_SCALAR);
 
     hid_t atype = H5Tcopy(H5T_C_S1);
-    H5Tset_size(atype, 1024);
+    H5Tset_size(atype, len);
     H5Tset_strpad(atype,H5T_STR_NULLTERM);
 
     /* Create the dataset. */
-    hid_t dataset_id = H5Dcreate2(location, name.c_str(), atype, dataspace_id,
+    hid_t dataset_id = H5Dcreate2(location, text, atype, dataspace_id,
                                   H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 
     /* Write the dataset. */
@@ -565,7 +577,7 @@ int write_detector_parameters() {
     saveDouble(det_grp,"y_pixel_size", PIXEL_SIZE_IN_UM/1000000.0, "m");
     saveString(det_grp,"sensor_material", SENSOR_MATERIAL);
     saveString(det_grp,"description", "PSI Jungfrau");
-    saveString(det_grp,"gain_setting", "auto"); // Automatic gain adjustement :)
+    // saveString(det_grp,"gain_setting", "auto"); // Automatic gain adjustement :)
     saveInt(det_grp, "bit_depth_image", experiment_settings.pixel_depth * 8);
     saveInt(det_grp, "bit_depth_readout", 16);
     if (experiment_settings.pixel_depth == 2) {
@@ -764,11 +776,11 @@ int open_master_hdf5() {
     H5Gclose(grp);
 
     grp = createGroup(master_file_id, "/entry/source","NXsource");
-    saveString(grp, "name", SOURCE_NAME, "", SOURCE_NAME_SHORT);
+    //saveString(grp, "name", SOURCE_NAME, "", SOURCE_NAME_SHORT);
     H5Gclose(grp);
 
     grp = createGroup(master_file_id, "/entry/instrument","NXinstrument");
-    saveString(grp, "name", INSTRUMENT_NAME, "", INSTRUMENT_NAME_SHORT);
+    //saveString(grp, "name", INSTRUMENT_NAME, "", INSTRUMENT_NAME_SHORT);
     H5Gclose(grp);
 
     grp = createGroup(master_file_id, "/entry/instrument/filter", "NXattenuator");
@@ -790,16 +802,16 @@ int open_master_hdf5() {
 
 int close_master_hdf5() {
     hid_t grp = H5Gopen2(master_file_id, "/entry", H5P_DEFAULT);
-    saveString(grp, "start_time", time_UTC(time_start.tv_sec, time_start.tv_nsec));
-    saveString(grp, "end_time_estimated", time_UTC(time_start.tv_sec + (time_t) (experiment_settings.nframes_to_collect * experiment_settings.frame_time)));
-    saveString(grp, "end_time", time_UTC(time_end.tv_sec, time_end.tv_nsec));
+    //saveString(grp, "start_time", time_UTC(time_start.tv_sec, time_start.tv_nsec));
+    //saveString(grp, "end_time_estimated", time_UTC(time_start.tv_sec + (time_t) (experiment_settings.nframes_to_collect * experiment_settings.frame_time)));
+    //saveString(grp, "end_time", time_UTC(time_end.tv_sec, time_end.tv_nsec));
     H5Gclose(grp);
 
     grp = H5Gopen2(master_file_id,  "/entry/instrument/detector/detectorSpecific", H5P_DEFAULT );
 
-    saveString(grp, "pedestal_G0_time", time_UTC(time_pedestalG0.tv_sec));
-    saveString(grp, "pedestal_G1_time", time_UTC(time_pedestalG1.tv_sec));
-    saveString(grp, "pedestal_G2_time", time_UTC(time_pedestalG2.tv_sec));
+    //saveString(grp, "pedestal_G0_time", time_UTC(time_pedestalG0.tv_sec));
+    //saveString(grp, "pedestal_G1_time", time_UTC(time_pedestalG1.tv_sec));
+    //saveString(grp, "pedestal_G2_time", time_UTC(time_pedestalG2.tv_sec));
 
     H5Gclose(grp);
 
