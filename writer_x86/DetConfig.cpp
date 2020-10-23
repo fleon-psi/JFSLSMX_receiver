@@ -32,7 +32,7 @@ int trigger_rpi() {
 
     std::vector<Pistache::Async::Promise<Pistache::Http::Response>> responses;
 
-    auto resp = client.get("http://mx-jungfrau-rpi-1:5000/trigger").send();
+    auto resp = client.get("http://x06da-jungfrau-rpi/trigger").send();
     resp.then(
 	[&](Pistache::Http::Response response) {
            retval = 0;
@@ -188,18 +188,19 @@ int setup_detector() {
 
 int trigger_detector() {
 #ifndef OFFLINE
-        if (writer_settings.timing_trigger) {
+       //if (writer_settings.timing_trigger) {
             std::cout << "Start detector" << std::endl;
+           usleep(250000);
             det->startDetector();
             // sleep 200 ms is necessary for SNAP setup
             // TODO: Likely 20-50 us would be enough
-            usleep(500000);
+            usleep(250000);
             trigger_rpi();
-        } else {
-            std::cout << "Start detector" << std::endl;
-            usleep(500000);
-            det->startDetector();
-        } 
+        //} else {
+        //    std::cout << "Start detector" << std::endl;
+        //    usleep(500000);
+        //    det->startDetector();
+        //}
 #endif
         return 0;
 }
@@ -208,8 +209,8 @@ int close_detector() {
 #ifndef OFFLINE
         std::cout << "Stop detector" << std::endl;
         stop_detector();
-        // std::cout << "Return to dynamic gain" << std::endl;
-        // det->setSettings(slsDetectorDefs::detectorSettings::DYNAMICGAIN);
+        std::cout << "Return to dynamic gain" << std::endl;
+        det->setSettings(slsDetectorDefs::detectorSettings::DYNAMICGAIN);
 #endif
         return 0;
 }
