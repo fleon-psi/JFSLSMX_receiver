@@ -321,7 +321,7 @@ void set_default_parameters() {
     experiment_settings.pedestalG1_frames = 1000;
     experiment_settings.pedestalG2_frames = 1000;
     experiment_settings.conversion_mode = MODE_CONV;
-    experiment_settings.enable_spot_finding = true;
+    experiment_settings.enable_spot_finding = false;
     experiment_settings.connect_spots_between_frames = true;
     experiment_settings.strong_pixel = 5.0;
     experiment_settings.min_pixels_per_spot = 3.0;
