@@ -338,12 +338,12 @@ void set_default_parameters() {
     writer_settings.influxdb_url="http://mx-jungfrau-1:8086";
 
     //These parameters are not changeable at the moment
-    writer_connection_settings[0].ib_dev_name = "mlx5_1";
+    writer_connection_settings[0].ib_dev_name = "mlx5_0";
     writer_connection_settings[0].receiver_host = "mx-ic922-1";
     writer_connection_settings[0].receiver_tcp_port = 52320;
 
     if (NCARDS == 2) {
-        writer_connection_settings[1].ib_dev_name = "mlx5_12";
+        writer_connection_settings[1].ib_dev_name = "mlx5_4";
         writer_connection_settings[1].receiver_host = "mx-ic922-1";
         writer_connection_settings[1].receiver_tcp_port = 52321;
     }
