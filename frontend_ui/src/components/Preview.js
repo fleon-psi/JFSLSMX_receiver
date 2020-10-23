@@ -19,7 +19,7 @@ class Preview extends Component {
   };
 
   componentDidMount() {
-    this.interval = setInterval(() => this.updateImg(), 1000);
+    this.interval = setInterval(() => this.updateImg(), 2000);
   }
 
   componentWillUnmount() {
@@ -57,7 +57,6 @@ class Preview extends Component {
             <Typography> Log scale </Typography>
             <Switch checked={this.state.logarithmic} onChange={this.handleChange} name="logarithmic" />
             <Typography> Spot count vs. rotation angle </Typography>
-            <SpotFindingPlot/>
           </Paper>
         </Grid>
         <Grid item xs={1}/>
