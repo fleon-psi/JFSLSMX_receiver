@@ -333,7 +333,7 @@ void set_default_parameters() {
     writer_settings.images_per_file = 1000;
     writer_settings.nthreads = NCARDS * 8; // Spawn 8 writer threads per card
     writer_settings.timing_trigger = true;
-    writer_settings.hdf18_compat = true;
+    writer_settings.hdf18_compat = false;
     writer_settings.default_path = "/mnt/ssd/";
     writer_settings.influxdb_url="http://mx-jungfrau-1:8086";
 
