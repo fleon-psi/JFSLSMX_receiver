@@ -39,7 +39,7 @@ void update_pedestal(ap_uint<512> data_in, ap_uint<18*32> &data_out, packed_pede
 			if (accumulate)
 				pedestal[j] += ((pedeG0_t) adu) / PEDESTAL_WINDOW_SIZE;
 			else
-				pedestal[j] += val_diff / PEDESTAL_WINDOW_SIZE;
+				pedestal[j] += ap_fixed<PEDE_G0_PRECISION+2 , 16>(val_diff) / PEDESTAL_WINDOW_SIZE;
 		}
                 if (((gain != 0x0) && (mode == MODE_PEDEG0)) ||
                     ((gain != 0x1) && (mode == MODE_PEDEG1)) ||
@@ -134,7 +134,7 @@ void convert(ap_uint<512> data_in, ap_uint<512> &data_out,
 			case 0: {
 				for (int k = 0; k < 18; k++)
 							val_diff[k] = after_pedeG0[i * 18 + k];
-				val_result = val_diff * (gainG0[i] / 512);
+				val_result = (val_diff * gainG0[i]) / 128;
 				//out_val[i] = val_result;
 				if (val_result >= 0)
 					out_val[i] = val_result + half;
