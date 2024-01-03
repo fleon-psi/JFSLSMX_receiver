@@ -8,7 +8,7 @@
     "@testing-library/react": "^9.5.0",
     "@testing-library/user-event": "^7.2.1",
     "material-ui": "^0.20.2",
-    "plotly.js": "^1.54.2",
+    "plotly.js": "^2.25.2",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
     "react-plotly.js": "^2.4.0",
